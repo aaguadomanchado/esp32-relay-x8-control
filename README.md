@@ -48,17 +48,17 @@ To flash firmware to this board, you need a USB-TTL Adapter (e.g., CP2102, CH340
 3. Press and release the **EN (Reset)** button.
 4. Release the **001 (Boot)** button.
 5. Upload the firmware.
-6. Sube la interfaz web (`data` folder) usando "Upload Filesystem Image".
+6. Upload the web interface (`data` folder) using "Upload Filesystem Image".
 
-## Integración rápida con Home Assistant
+## Quick Home Assistant Integration
 
-Añade lo siguiente a tu `configuration.yaml` (ajusta la IP y repite para los 8 canales):
+Add the following to your `configuration.yaml` (adjust the IP and repeat for all 8 channels):
 
 ```yaml
 switch:
   - platform: rest
-    name: "Relé 1"
-    resource: "http://<IP_PLACA>/api/ha"
+    name: "Relay 1"
+    resource: "http://<BOARD_IP>/api/ha"
     method: post
     body_on: 'channel=1&state=ON'
     body_off: 'channel=1&state=OFF'
@@ -92,6 +92,11 @@ This project includes a comprehensive firmware with a Web Interface for full con
   - JSON API: Full REST API for integration with other systems (`/status`, `/toggle`, etc.).
 
 ## Changelog
+
+### v0.3
+- **New Feature**: Specific HTTP API for Home Assistant (`/api/ha`).
+- **Persistence**: Relay states are saved and restored after reboot or power loss.
+- **Improved UI**: Timer inputs are visually disabled when the timer is switched off.
 
 ### v0.2
 - **New Feature**: Added status LED indicators (GPIO 23).
