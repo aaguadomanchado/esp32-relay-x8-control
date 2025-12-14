@@ -113,19 +113,28 @@ void handleSetTimer() {
     timers[idx].startM = startStr.substring(3, 5).toInt();
     timers[idx].endH = endStr.substring(0, 2).toInt();
     timers[idx].endM = endStr.substring(3, 5).toInt();
-    timers[idx].enabled = true;
+
+    // Check enabled param (default true if missing for backward compat)
+    if (server.hasArg("enabled")) {
+      timers[idx].enabled = server.arg("enabled") == "1";
+    } else {
+      timers[idx].enabled = true;
+    }
 
     // Save to NVS for persistence
     preferences.begin("timers", false);
     String key = "t" + String(ch);
+    // Format: startH,startM,endH,endM,enabled
     String value = String(timers[idx].startH) + "," +
                    String(timers[idx].startM) + "," + String(timers[idx].endH) +
-                   "," + String(timers[idx].endM);
+                   "," + String(timers[idx].endM) + "," +
+                   String(timers[idx].enabled ? 1 : 0);
     preferences.putString(key.c_str(), value);
     preferences.end();
 
+    String stateStr = timers[idx].enabled ? " [ON]" : " [OFF]";
     logEvent("Timer Set " + relayLabels[idx] + ": " + startStr + " - " +
-             endStr);
+             endStr + stateStr);
     server.send(200, "text/plain", "OK");
   } else
     server.send(400, "text/plain", "Missing args");
@@ -168,7 +177,9 @@ void handleGetTimers() {
   for (int i = 0; i < 8; i++) {
     json += "{";
     json += "\"enabled\":" + String(timers[i].enabled ? "true" : "false");
-    if (timers[i].enabled) {
+
+    // Always return times if they are valid (not -1)
+    if (timers[i].startH != -1) {
       char buf[16];
       sprintf(buf, ",\"start\":\"%02d:%02d\"", timers[i].startH,
               timers[i].startM);
@@ -366,13 +377,23 @@ void setup() {
         timers[idx].startH = value.substring(0, comma1).toInt();
         timers[idx].startM = value.substring(comma1 + 1, comma2).toInt();
         timers[idx].endH = value.substring(comma2 + 1, comma3).toInt();
-        timers[idx].endM = value.substring(comma3 + 1).toInt();
-        timers[idx].enabled = true;
 
+        // Handle new format with 5th element (enabled)
+        int comma4 = value.indexOf(',', comma3 + 1);
+        if (comma4 > 0) {
+          timers[idx].endM = value.substring(comma3 + 1, comma4).toInt();
+          timers[idx].enabled = value.substring(comma4 + 1).toInt() == 1;
+        } else {
+          // Old format
+          timers[idx].endM = value.substring(comma3 + 1).toInt();
+          timers[idx].enabled = true;
+        }
+
+        String stateStr = timers[idx].enabled ? " [ON]" : " [OFF]";
         logEvent("Timer Loaded " + relayLabels[idx] + ": " +
                  String(timers[idx].startH) + ":" + String(timers[idx].startM) +
                  " - " + String(timers[idx].endH) + ":" +
-                 String(timers[idx].endM));
+                 String(timers[idx].endM) + stateStr);
       }
     }
   }

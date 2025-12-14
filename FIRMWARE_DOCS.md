@@ -65,8 +65,8 @@ El servidor web escucha en el puerto 80. Todas las respuestas son en texto plano
 | Endpoint | Método | Parámetros | Descripción |
 |----------|--------|------------|-------------|
 | `/get_timers` | GET | - | JSON Array con configs `[{enabled, start, end},...]` |
-| `/set_timer` | GET | `channel`, `start` (HH:MM), `end` (HH:MM) | Activa y guarda temporizador. |
-| `/clear_timer`| GET | `channel` | Desactiva y borra temporizador. |
+| `/set_timer` | GET | `channel`, `start` (HH:MM), `end` (HH:MM), `enabled` (0/1) | Activa/Desactiva y guarda temporizador. |
+| `/clear_timer`| GET | `channel` | Borra configuración de temporizador y lo desactiva. |
 
 ### Sistema y Red
 
@@ -87,7 +87,7 @@ El firmware utiliza la librería `Preferences` para guardar configuración en la
 | `wifi-config` | `ssid` | String | Nombre de red WiFi |
 | `wifi-config` | `pass` | String | Contraseña WiFi |
 | `relay-labels` | `label{N}` | String | Nombre personalizado para canal N (1-8) |
-| `timers` | `t{N}` | String | Configuración temporizador: "startH,startM,endH,endM" |
+| `timers` | `t{N}` | String | Configuración temporizador: "startH,startM,endH,endM,enabled" |
 
 ## Lógica Interna
 

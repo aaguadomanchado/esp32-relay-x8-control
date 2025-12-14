@@ -634,10 +634,13 @@ const char index_html[] PROGMEM = R"rawliteral(
             // data is array of {enabled, start, end}
             for(let i=1; i<=numRelays; i++) {
                 const t = data[i-1];
-                if(t.enabled) {
-                    document.getElementById(`start${i}`).value = t.start;
-                    document.getElementById(`end${i}`).value = t.end;
-                }
+                // Set switch state
+                const cb = document.getElementById(`timerEnable${i}`);
+                if(cb) cb.checked = t.enabled;
+
+                // Set times (backend now returns them even if disabled)
+                if(t.start) document.getElementById(`start${i}`).value = t.start;
+                if(t.end) document.getElementById(`end${i}`).value = t.end;
             }
             logToConsole("Timers Loaded");
         })
@@ -701,10 +704,16 @@ const char index_html[] PROGMEM = R"rawliteral(
          const row = document.createElement('div');
          row.className = 'timer-row';
          row.innerHTML = `
-            <h3>${relayLabels[i-1]}</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:10px;">
+                <h3 style="margin:0;">${relayLabels[i-1]}</h3>
+                <label class="switch" style="transform:scale(0.8);">
+                    <input type="checkbox" id="timerEnable${i}">
+                    <span class="slider"></span>
+                </label>
+            </div>
             <div class="timer-controls">
-              <label style="flex:1; min-width:140px;">ON: <input type="time" id="start${i}" class="time-input" style="width:100%; margin-top:5px;"></label>
-              <label style="flex:1; min-width:140px;">OFF: <input type="time" id="end${i}" class="time-input" style="width:100%; margin-top:5px;"></label>
+              <label style="flex:1; min-width:140px;">ON: <input type="time" id="start${i}" class="time-input" style="width:100%;"></label>
+              <label style="flex:1; min-width:140px;">OFF: <input type="time" id="end${i}" class="time-input" style="width:100%;"></label>
               <button class="btn-save" onclick="saveTimer(${i})" style="min-width:100px;">Guardar</button>
             </div>
          `;
@@ -715,14 +724,14 @@ const char index_html[] PROGMEM = R"rawliteral(
   function saveTimer(id) {
       const start = document.getElementById(`start${id}`).value; // "HH:MM"
       const end = document.getElementById(`end${id}`).value;     // "HH:MM"
+      const enabled = document.getElementById(`timerEnable${id}`).checked ? 1 : 0;
       
       if(!start || !end) return alert("Define hora inicio y fin");
 
-      fetch(`/set_timer?channel=${id}&start=${start}&end=${end}`)
+      fetch(`/set_timer?channel=${id}&start=${start}&end=${end}&enabled=${enabled}`)
         .then(r => r.text())
         .then(msg => {
-            logToConsole(`Timer ${id} Saved`);
-            alert("Timer Guardado!");
+            logToConsole(`Timer ${id} Saved [${enabled ? 'ON' : 'OFF'}]`);
         });
   }
 
