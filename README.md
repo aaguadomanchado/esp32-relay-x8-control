@@ -48,6 +48,24 @@ To flash firmware to this board, you need a USB-TTL Adapter (e.g., CP2102, CH340
 3. Press and release the **EN (Reset)** button.
 4. Release the **001 (Boot)** button.
 5. Upload the firmware.
+6. Sube la interfaz web (`data` folder) usando "Upload Filesystem Image".
+
+## Integración rápida con Home Assistant
+
+Añade lo siguiente a tu `configuration.yaml` (ajusta la IP y repite para los 8 canales):
+
+```yaml
+switch:
+  - platform: rest
+    name: "Relé 1"
+    resource: "http://<IP_PLACA>/api/ha"
+    method: post
+    body_on: 'channel=1&state=ON'
+    body_off: 'channel=1&state=OFF'
+    is_on_template: '{{ value_json.r1 == "ON" }}'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+```
 
 ## Firmware Features
 

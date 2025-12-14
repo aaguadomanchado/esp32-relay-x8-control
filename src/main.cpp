@@ -52,6 +52,12 @@ void handleToggle() {
       int idx = channel - 1;
       relayState[idx] = state;
       digitalWrite(RELAY_PINS[idx], state ? HIGH : LOW);
+
+      // Save state
+      preferences.begin("relay-states", false);
+      preferences.putInt(("r" + String(idx)).c_str(), state);
+      preferences.end();
+
       logEvent("Manual: " + relayLabels[idx] + (state ? " ON" : " OFF"));
       server.send(200, "text/plain", "OK");
       return;
@@ -246,6 +252,11 @@ void checkTimers() {
       if (relayState[i] == 0) {
         relayState[i] = 1;
         digitalWrite(RELAY_PINS[i], HIGH);
+
+        preferences.begin("relay-states", false);
+        preferences.putInt(("r" + String(i)).c_str(), 1);
+        preferences.end();
+
         logEvent("Timer Trigger: " + relayLabels[i] + " ON");
       }
     }
@@ -254,6 +265,11 @@ void checkTimers() {
       if (relayState[i] == 1) {
         relayState[i] = 0;
         digitalWrite(RELAY_PINS[i], LOW);
+
+        preferences.begin("relay-states", false);
+        preferences.putInt(("r" + String(i)).c_str(), 0);
+        preferences.end();
+
         logEvent("Timer Trigger: " + relayLabels[i] + " OFF");
       }
     }
@@ -351,17 +367,64 @@ void handleSetLabel() {
   }
 }
 
+// -- HOME ASSISTANT API --
+// GET /api/ha -> Returns {"r1":"OFF", "r2":"ON", ...}
+// POST /api/ha?channel=1&state=ON -> Sets state and returns current json
+void handleHA() {
+  // Handle POST/GET Action
+  if (server.hasArg("channel") && server.hasArg("state")) {
+    int ch = server.arg("channel").toInt();
+    String stateStr = server.arg("state");
+    stateStr.toUpperCase();
+
+    if (ch >= 1 && ch <= 8 && (stateStr == "ON" || stateStr == "OFF")) {
+      int idx = ch - 1;
+      int newState = (stateStr == "ON") ? 1 : 0;
+
+      if (relayState[idx] != newState) {
+        relayState[idx] = newState;
+        digitalWrite(RELAY_PINS[idx], newState ? HIGH : LOW);
+
+        // Save state
+        preferences.begin("relay-states", false);
+        preferences.putInt(("r" + String(idx)).c_str(), newState);
+        preferences.end();
+
+        logEvent("HA API: " + relayLabels[idx] + " -> " + stateStr);
+      }
+    } else {
+      // Invalid request
+    }
+  }
+
+  // Build JSON Response
+  String json = "{";
+  for (int i = 0; i < 8; i++) {
+    if (i > 0)
+      json += ",";
+    json +=
+        "\"r" + String(i + 1) + "\":\"" + (relayState[i] ? "ON" : "OFF") + "\"";
+  }
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
 // -- SETUP --
 void setup() {
   Serial.begin(115200);
 
-  // Init Pins
+  // Init Pins & Restore State
+  preferences.begin("relay-states", true);
   pinMode(VIS_STATUS_LED, OUTPUT);
   digitalWrite(VIS_STATUS_LED, LOW);
   for (int i = 0; i < NUM_RELAYS; i++) {
     pinMode(RELAY_PINS[i], OUTPUT);
-    digitalWrite(RELAY_PINS[i], LOW);
+    // Load saved state (default 0/OFF)
+    int savedState = preferences.getInt(("r" + String(i)).c_str(), 0);
+    relayState[i] = savedState;
+    digitalWrite(RELAY_PINS[i], savedState ? HIGH : LOW);
   }
+  preferences.end();
 
   // Load saved labels
   preferences.begin("relay-labels", true);
@@ -474,6 +537,8 @@ void setup() {
   // Labels
   server.on("/get_labels", handleGetLabels);
   server.on("/set_label", handleSetLabel);
+  // Home Assistant
+  server.on("/api/ha", handleHA);
 
   server.begin();
   server.begin();

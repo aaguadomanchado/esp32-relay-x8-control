@@ -66,6 +66,12 @@ El servidor web escucha en el puerto 80. Todas las respuestas son en texto plano
 | `/get_labels` | GET | - | Lista de nombres. Retorna JSON ARRAY `["Luz 1",...]` |
 | `/set_label` | GET | `channel` (1-8), `label` (String) | Guarda nuevo nombre. Retorna "OK". |
 
+### Integración Home Assistant
+
+| Endpoint | Método | Parámetros | Descripción |
+|----------|--------|------------|-------------|
+| `/api/ha` | POST/GET | `channel` (1-8), `state` (ON/OFF) | Optimizado para `RESTful Switch`. Retorna JSON `{"r1":"OFF", "r2":"ON"...}` con el estado de todos los relés. |
+
 ### Temporizadores
 
 | Endpoint | Método | Parámetros | Descripción |

@@ -182,6 +182,12 @@ const char index_html[] PROGMEM = R"rawliteral(
       flex: 1;
       min-width: 120px;
     }
+    .time-input:disabled {
+        background-color: #252525;
+        color: #555;
+        border-color: #333;
+        cursor: not-allowed;
+    }
     .btn-save {
       background: var(--accent-color); 
       color: black; 
@@ -641,6 +647,9 @@ const char index_html[] PROGMEM = R"rawliteral(
                 // Set times (backend now returns them even if disabled)
                 if(t.start) document.getElementById(`start${i}`).value = t.start;
                 if(t.end) document.getElementById(`end${i}`).value = t.end;
+                
+                // Update UI state
+                toggleTimerInputs(i);
             }
             logToConsole("Timers Loaded");
         })
@@ -707,7 +716,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:10px;">
                 <h3 style="margin:0;">${relayLabels[i-1]}</h3>
                 <label class="switch" style="transform:scale(0.8);">
-                    <input type="checkbox" id="timerEnable${i}">
+                    <input type="checkbox" id="timerEnable${i}" onchange="toggleTimerInputs(${i})">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -733,6 +742,15 @@ const char index_html[] PROGMEM = R"rawliteral(
         .then(msg => {
             logToConsole(`Timer ${id} Saved [${enabled ? 'ON' : 'OFF'}]`);
         });
+  }
+
+  function toggleTimerInputs(id) {
+    const enabled = document.getElementById(`timerEnable${id}`).checked;
+    const startInput = document.getElementById(`start${id}`);
+    const endInput = document.getElementById(`end${id}`);
+    
+    startInput.disabled = !enabled;
+    endInput.disabled = !enabled;
   }
 
   // -- COMMON --
