@@ -16,6 +16,7 @@ Preferences preferences;
 
 // Global state
 int relayState[8] = {0};
+const char *APP_VERSION = "0.1";
 String logBuffer = "";
 String relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
                          "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
@@ -433,6 +434,7 @@ void setup() {
     if (MDNS.begin("esp32")) {
       logEvent("mDNS responder started: esp32.local");
     }
+    logEvent("System Started - v" + String(APP_VERSION));
   } else {
     logEvent("Connection failed or no config. Starting AP.");
     WiFi.mode(WIFI_AP);
