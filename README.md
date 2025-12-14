@@ -1,5 +1,9 @@
 # ESP32 Relay Board x8 Project
 
+![ESP32 Relay Board x8](https://devices.esphome.io/assets/images/image-42531fa600cef0d4854d8601aaf12503.jpg)
+
+**[🛒 Buy on AliExpress](https://www.aliexpress.us/item/3256802045374301.html)**
+
 This project is designed for the **ESP32 Relay Board x8** based on the ESP32-WROOM-32E module.
 
 ## Hardware Specifications
