@@ -72,3 +72,15 @@ This project includes a comprehensive firmware with a Web Interface for full con
 - **Developer Tools**:
   - Web Serial Console: View debug logs directly in the browser (Test-Debug tab).
   - JSON API: Full REST API for integration with other systems (`/status`, `/toggle`, etc.).
+
+## Changelog
+
+### v0.2
+- **New Feature**: Added status LED indicators (GPIO 23).
+  - **Fast Blink**: Connecting to WiFi.
+  - **Solid ON**: Connected to WiFi.
+  - **Slow Blink**: AP Mode active.
+- **UI Update**: Version number displayed in the header.
+
+### v0.1
+- **Initial Release**: Basic functionality, relay control, timers, and Web UI.

@@ -35,10 +35,16 @@ Este firmware está diseñado para controlar una placa de 8 relés basada en ESP
 - Etiquetas personalizables para cada uno de los 8 relés.
 - Persistencia en NVS.
 
-### 5. Sincronización de Hora
+- **Sincronización de Hora**:
 - Cliente NTP automático (`pool.ntp.org`).
 - Sincronización manual desde el navegador (como fallback).
 - Zona horaria configurada: UTC+1.
+
+### 6. Indicadores de Estado (LED)
+- **GPIO 23 (LED Integrado)**:
+  - **Parpadeo Rápido (100ms)**: Intentando conectar a WiFi / Iniciando.
+  - **Fijo (ON)**: Conexión WiFi establecida y sistema listo.
+  - **Parpadeo Lento (1000ms)**: Modo Punto de Acceso (AP) activo por fallo de conexión.
 
 ## API Reference (Endpoints HTTP)
 
