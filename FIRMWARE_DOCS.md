@@ -1,119 +1,119 @@
-# Documentación Técnica del Firmware ESP32 Relay X8
+# ESP32 Relay X8 Firmware Technical Documentation
 
-## Visión General
+## Overview
 
-Este firmware está diseñado para controlar una placa de 8 relés basada en ESP32 (ESP32-WROOM-32E). Proporciona una interfaz web completa para el control manual, monitorización en tiempo real, programación de temporizadores y configuración del sistema.
+This firmware is designed to control an 8-channel relay board based on ESP32 (ESP32-WROOM-32E). It provides a full web interface for manual control, real-time monitoring, timer scheduling, and system configuration.
 
-## Estructura del Proyecto
+## Project Structure
 
-- `src/main.cpp`: Lógica principal del firmware, configuración de hardware, servidor web y gestión de tareas.
-- `include/index_html.h`: Contiene el código fuente HTML/CSS/JS de la interfaz web, almacenado en memoria flash (PROGMEM).
-- `include/pinout.h`: Definiciones de pines para el hardware específico.
-- `platformio.ini`: Configuración del entorno de compilación y dependencias.
+- `src/main.cpp`: Main firmware logic, hardware setup, web server, and task management.
+- `include/index_html.h`: Source code for HTML/CSS/JS web interface, stored in flash memory (PROGMEM).
+- `include/pinout.h`: Pin definitions for specific hardware.
+- `platformio.ini`: Build environment configuration and dependencies.
 
-## Características Principales
+## Key Features
 
-### 1. Gestión WiFi
-- **Modo Punto de Acceso (AP)**: Si no hay configuración WiFi guardada o falla la conexión.
+### 1. WiFi Management
+- **Access Point Mode (AP)**: If no WiFi config is saved or connection fails.
   - SSID: `ESP32-Relay-X8`
   - Pass: `12345678`
   - IP: `192.168.4.1`
-- **Modo Estación (STA)**: Se conecta a una red WiFi configurada.
-- **mDNS**: Publica el host como `esp32.local`.
+- **Station Mode (STA)**: Connects to a configured WiFi network.
+- **mDNS**: Publishes host as `esp32.local`.
 
-### 2. Control de Relés
-- Control independiente para 8 canales.
-- Lógica Active-HIGH (High = ON, Low = OFF).
-- Estado persistente en RAM (se reinicia al apagar, por seguridad).
+### 2. Relay Control
+- Independent control for 8 channels.
+- Active-HIGH Logic (High = ON, Low = OFF).
+- Persistent state in NVS (Restores state after power loss).
 
-### 3. Temporizadores
-- Cada relé tiene un temporizador diario programable asociado.
-- Configuración: Hora de inicio (ON) y Hora de fin (OFF).
-- Persistencia: Se guardan en memoria no volátil (NVS).
+### 3. Timers
+- Each relay has an associated programmable daily timer.
+- Configuration: Start Time (ON) and End Time (OFF).
+- Persistence: Saved in Non-Volatile Storage (NVS).
 
-### 4. Personalización
-- Etiquetas personalizables para cada uno de los 8 relés.
-- Persistencia en NVS.
+### 4. Customization
+- Customizable labels for each of the 8 relays.
+- Persistence in NVS.
 
-- **Sincronización de Hora**:
-- Cliente NTP automático (`pool.ntp.org`).
-- Sincronización manual desde el navegador (como fallback).
-- Zona horaria configurada: UTC+1.
+### 5. Time Synchronization
+- Automatic NTP Client (`pool.ntp.org`).
+- Manual sync via browser (as fallback).
+- Configured Timezone: UTC+1.
 
-### 6. Indicadores de Estado (LED)
-- **GPIO 23 (LED Integrado)**:
-  - **Parpadeo Rápido (100ms)**: Intentando conectar a WiFi / Iniciando.
-  - **Fijo (ON)**: Conexión WiFi establecida y sistema listo.
-  - **Parpadeo Lento (1000ms)**: Modo Punto de Acceso (AP) activo por fallo de conexión.
+### 6. Status Indicators (LED)
+- **GPIO 23 (Integrated LED)**:
+  - **Fast Blink (100ms)**: Attempting to connect to WiFi / Booting.
+  - **Solid ON**: WiFi connection established and system ready.
+  - **Slow Blink (1000ms)**: Access Point (AP) mode active due to connection failure.
 
-## API Reference (Endpoints HTTP)
+## API Reference (HTTP Endpoints)
 
-El servidor web escucha en el puerto 80. Todas las respuestas son en texto plano o JSON.
+The web server listens on port 80. All responses are plain text or JSON.
 
-### Control y Estado
+### Control and Status
 
-| Endpoint | Método | Parámetros | Descripción |
+| Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
-| `/` | GET | - | Interfaz Web Principal (Gzipped HTML) |
-| `/status` | GET | - | Estado actual de relés. Retorna JSON ARRAY `[0,1,0,...]` |
-| `/toggle` | GET | `channel` (1-8), `state` (0/1) | Cambia estado de relé. Retorna "OK" o error. |
-| `/logs` | GET | - | Buffer de logs del sistema (últimos 2000 caracteres) |
+| `/` | GET | - | Main Web Interface (Gzipped HTML) |
+| `/status` | GET | - | Current relay status. Returns JSON ARRAY `[0,1,0,...]` |
+| `/toggle` | GET | `channel` (1-8), `state` (0/1) | Toggles relay state. Returns "OK" or error. |
+| `/logs` | GET | - | System logs buffer (last 2000 chars) |
 
-### Gestión de Etiquetas
+### Label Management
 
-| Endpoint | Método | Parámetros | Descripción |
+| Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
-| `/get_labels` | GET | - | Lista de nombres. Retorna JSON ARRAY `["Luz 1",...]` |
-| `/set_label` | GET | `channel` (1-8), `label` (String) | Guarda nuevo nombre. Retorna "OK". |
+| `/get_labels` | GET | - | List of names. Returns JSON ARRAY `["Light 1",...]` |
+| `/set_label` | GET | `channel` (1-8), `label` (String) | Saves new name. Returns "OK". |
 
-### Integración Home Assistant
+### Home Assistant Integration
 
-| Endpoint | Método | Parámetros | Descripción |
+| Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
-| `/api/ha` | POST/GET | `channel` (1-8), `state` (ON/OFF) | Optimizado para `RESTful Switch`. Retorna JSON `{"r1":"OFF", "r2":"ON"...}` con el estado de todos los relés. |
+| `/api/ha` | POST/GET | `channel` (1-8), `state` (ON/OFF) | Optimized for `RESTful Switch`. Returns JSON `{"r1":"OFF", "r2":"ON"...}` with all relay states. |
 
-### Temporizadores
+### Timers
 
-| Endpoint | Método | Parámetros | Descripción |
+| Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
-| `/get_timers` | GET | - | JSON Array con configs `[{enabled, start, end},...]` |
-| `/set_timer` | GET | `channel`, `start` (HH:MM), `end` (HH:MM), `enabled` (0/1) | Activa/Desactiva y guarda temporizador. |
-| `/clear_timer`| GET | `channel` | Borra configuración de temporizador y lo desactiva. |
+| `/get_timers` | GET | - | JSON Array with configs `[{enabled, start, end},...]` |
+| `/set_timer` | GET | `channel`, `start` (HH:MM), `end` (HH:MM), `enabled` (0/1) | Enables/Disables and saves timer. |
+| `/clear_timer`| GET | `channel` | Clears timer config and disables. |
 
-### Sistema y Red
+### System and Network
 
-| Endpoint | Método | Parámetros | Descripción |
+| Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
-| `/get_time` | GET | - | Hora sistema. JSON `{epoch, year, str}` |
-| `/set_time` | GET | `epoch` (Unix timestamp) | Establece hora manualmente. |
-| `/scan` | GET | - | Escanea redes WiFi. Retorna JSON Array. |
-| `/save_wifi` | GET | `ssid`, `pass` | Guarda credenciales y reinicia. |
-| `/reset_wifi` | GET | - | Borra credenciales y reinicia. |
+| `/get_time` | GET | - | System time. JSON `{epoch, year, str}` |
+| `/set_time` | GET | `epoch` (Unix timestamp) | Sets time manually. |
+| `/scan` | GET | - | Scans WiFi networks. Returns JSON Array. |
+| `/save_wifi` | GET | `ssid`, `pass` | Saves credentials and restarts. |
+| `/reset_wifi` | GET | - | Clears credentials and restarts. |
 
-## Persistencia de Datos (NVS)
+## Data Persistence (NVS)
 
-El firmware utiliza la librería `Preferences` para guardar configuración en la partición NVS del ESP32.
+Firmware uses the `Preferences` library to save configuration in the ESP32 NVS partition.
 
-| Espacio de Nombres | Clave | Tipo | Contenido |
+| Namespace | Key | Type | Content |
 |-------------------|-------|------|-----------|
-| `wifi-config` | `ssid` | String | Nombre de red WiFi |
-| `wifi-config` | `pass` | String | Contraseña WiFi |
-| `relay-labels` | `label{N}` | String | Nombre personalizado para canal N (1-8) |
-| `timers` | `t{N}` | String | Configuración temporizador: "startH,startM,endH,endM,enabled" |
+| `wifi-config` | `ssid` | String | WiFi Network Name |
+| `wifi-config` | `pass` | String | WiFi Password |
+| `relay-labels` | `label{N}` | String | Custom name for channel N (1-8) |
+| `timers` | `t{N}` | String | Timer config: "startH,startM,endH,endM,enabled" |
 
-## Lógica Interna
+## Internal Logic
 
-- **Loop Principal**:
-  - Manejo de clientes web (`server.handleClient()`).
-  - Verificación de temporizadores (`checkTimers()`) cada segundo.
-- **Sistema de Logs**: Buffer circular en memoria RAM de 2KB para visualización web.
+- **Main Loop**:
+  - Web client handling (`server.handleClient()`).
+  - Timer Check (`checkTimers()`) every second.
+- **Log System**: RAM circular buffer (2KB) for web visualization.
 - **Web Interface**:
-  - Single Page Application (SPA) embebida.
-  - Actualización periódica cada 2s (`/status`).
-  - Actualización de logs cada 1s (`/logs`).
-  - Diseño Responsive (Mobile-First).
+  - Embedded Single Page Application (SPA).
+  - Periodic update every 2s (`/status`).
+  - Log update every 1s (`/logs`).
+  - Responsive Design (Mobile-First).
 
-## Dependencias
+## Dependencies
 
 - **Arduino Core for ESP32**
 - **Libraries**:
@@ -122,8 +122,8 @@ El firmware utiliza la librería `Preferences` para guardar configuración en la
   - `ESPmDNS`
   - `Preferences`
 
-## Flujo de Compilación
+## Compilation Flow
 
-1. `index_html.h` contiene el frontend minificado/optimizado.
-2. `Preferences` gestiona el almacenamiento no volátil.
-3. El orden de includes en `main.cpp` es crítico (`WiFi.h` antes de `WebServer.h`).
+1. `index_html.h` contains the minified/optimized frontend.
+2. `Preferences` manages non-volatile storage.
+3. Order of includes in `main.cpp` is critical (`WiFi.h` before `WebServer.h`).
