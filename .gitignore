@@ -6,6 +6,11 @@
 *.pyc
 __pycache__/
 
+# Python virtual environment
+.venv/
+venv/
+env/
+
 # Build artifacts
 *.o
 *.elf
