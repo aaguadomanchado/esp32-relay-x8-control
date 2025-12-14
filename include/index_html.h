@@ -367,7 +367,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <h1>ESP32 Control <span style="font-size:0.5em; color:#777;">v0.2</span></h1>
+  <h1>ESP32 Control <span style="font-size:0.5em; color:#777;">v0.3</span></h1>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="openTab('monitor')">Monitor</button>
