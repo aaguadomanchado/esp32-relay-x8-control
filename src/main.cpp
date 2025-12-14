@@ -20,6 +20,7 @@ const char *APP_VERSION = "0.2";
 String logBuffer = "";
 String relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
                          "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
+bool isApMode = false;
 
 // Timer Structure
 struct Timer {
@@ -259,6 +260,16 @@ void checkTimers() {
   }
 }
 
+void updateLed() {
+  if (isApMode) {
+    static unsigned long lastBlink = 0;
+    if (millis() - lastBlink > 1000) {
+      lastBlink = millis();
+      digitalWrite(VIS_STATUS_LED, !digitalRead(VIS_STATUS_LED));
+    }
+  }
+}
+
 // -- WIFI MANAGER --
 
 void handleScan() {
@@ -419,13 +430,15 @@ void setup() {
         connected = true;
         break;
       }
-      delay(500);
-      Serial.print(".");
+      // Fast blink 100ms
+      digitalWrite(VIS_STATUS_LED, !digitalRead(VIS_STATUS_LED));
+      delay(100);
     }
   }
 
   if (connected) {
     logEvent("Connected! IP: " + WiFi.localIP().toString());
+    digitalWrite(VIS_STATUS_LED, HIGH); // Solid ON
 
     // NTP Setup: UTC+1 (3600s offset), Daylight Savings 1h (3600s)
     configTime(3600, 3600, "pool.ntp.org");
@@ -437,6 +450,7 @@ void setup() {
     logEvent("System Started - v" + String(APP_VERSION));
   } else {
     logEvent("Connection failed or no config. Starting AP.");
+    isApMode = true;
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
     IPAddress IP = WiFi.softAPIP();
@@ -462,10 +476,13 @@ void setup() {
   server.on("/set_label", handleSetLabel);
 
   server.begin();
-  digitalWrite(VIS_STATUS_LED, HIGH);
+  server.begin();
+  if (!isApMode)
+    digitalWrite(VIS_STATUS_LED, HIGH); // Ensure solid ON if not AP
 }
 
 void loop() {
   server.handleClient();
   checkTimers();
+  updateLed();
 }
