@@ -637,16 +637,36 @@ const char index_html[] PROGMEM = R"rawliteral(
       fetch('/get_timers')
         .then(r => r.json())
         .then(data => {
-            // data is array of {enabled, start, end}
+            // data is array of {enabled, start, end, isDuration, duration}
             for(let i=1; i<=numRelays; i++) {
                 const t = data[i-1];
                 // Set switch state
                 const cb = document.getElementById(`timerEnable${i}`);
                 if(cb) cb.checked = t.enabled;
 
+                // Set mode
+                const dailyRadio = document.querySelector(`input[name="mode${i}"][value="daily"]`);
+                const durationRadio = document.querySelector(`input[name="mode${i}"][value="duration"]`);
+                if (t.isDuration) {
+                  durationRadio.checked = true;
+                } else {
+                  dailyRadio.checked = true;
+                }
+
                 // Set times (backend now returns them even if disabled)
-                if(t.start) document.getElementById(`start${i}`).value = t.start;
+                if(t.start) {
+                  document.getElementById(`start${i}`).value = t.start;
+                  document.getElementById(`startDur${i}`).value = t.start;
+                }
                 if(t.end) document.getElementById(`end${i}`).value = t.end;
+                
+                // Set duration
+                const h = Math.floor(t.duration / 3600);
+                const m = Math.floor((t.duration % 3600) / 60);
+                const s = t.duration % 60;
+                document.getElementById(`durH${i}`).value = h;
+                document.getElementById(`durM${i}`).value = m;
+                document.getElementById(`durS${i}`).value = s;
                 
                 // Update UI state
                 toggleTimerInputs(i);
@@ -720,37 +740,110 @@ const char index_html[] PROGMEM = R"rawliteral(
                     <span class="slider"></span>
                 </label>
             </div>
-            <div class="timer-controls">
+            <div style="margin-bottom:10px;">
+              <label><input type="radio" name="mode${i}" value="daily" checked onchange="toggleMode(${i})"> Horario diario</label>
+              <label><input type="radio" name="mode${i}" value="duration" onchange="toggleMode(${i})"> Duración</label>
+            </div>
+            <div class="timer-controls" id="dailyControls${i}">
               <label style="flex:1; min-width:140px;">ON: <input type="time" id="start${i}" class="time-input" style="width:100%;"></label>
               <label style="flex:1; min-width:140px;">OFF: <input type="time" id="end${i}" class="time-input" style="width:100%;"></label>
-              <button class="btn-save" onclick="saveTimer(${i})" style="min-width:100px;">Guardar</button>
             </div>
+            <div class="timer-controls" id="durationControls${i}" style="display:none; flex-direction: column; gap: 10px;">
+              <label style="flex:1; min-width:140px;">Inicio: <input type="time" id="startDur${i}" class="time-input" style="width:100%;"></label>
+              <div style="display: flex; gap: 10px; width: 100%;">
+                <label style="flex:1; min-width:50px; max-width:60px;">H: <input type="number" id="durH${i}" class="time-input" min="0" max="24" maxlength="2" style="width:100%;"></label>
+                <label style="flex:1; min-width:50px; max-width:60px;">M: <input type="number" id="durM${i}" class="time-input" min="0" max="59" maxlength="2" style="width:100%;"></label>
+                <label style="flex:1; min-width:50px; max-width:60px;">S: <input type="number" id="durS${i}" class="time-input" min="0" max="59" maxlength="2" style="width:100%;"></label>
+              </div>
+            </div>
+            <button class="btn-save" onclick="saveTimer(${i})" style="width:100%; margin-top:10px;">Guardar</button>
+            <div id="timerStatus${i}" style="margin-top:5px; font-size:0.9rem; color:#666;"></div>
          `;
          list.appendChild(row);
      }
   }
 
   function saveTimer(id) {
-      const start = document.getElementById(`start${id}`).value; // "HH:MM"
-      const end = document.getElementById(`end${id}`).value;     // "HH:MM"
-      const enabled = document.getElementById(`timerEnable${id}`).checked ? 1 : 0;
-      
-      if(!start || !end) return alert("Define hora inicio y fin");
+      const statusDiv = document.getElementById(`timerStatus${id}`);
+      statusDiv.innerHTML = "";
+      statusDiv.style.color = "#666";
 
-      fetch(`/set_timer?channel=${id}&start=${start}&end=${end}&enabled=${enabled}`)
+      const enabled = document.getElementById(`timerEnable${id}`).checked ? 1 : 0;
+      const mode = document.querySelector(`input[name="mode${id}"]:checked`).value;
+      
+      let params = `channel=${id}&enabled=${enabled}`;
+      let details = "";
+      
+      if (mode === 'daily') {
+        const start = document.getElementById(`start${id}`).value;
+        const end = document.getElementById(`end${id}`).value;
+        if(!start || !end) {
+          statusDiv.innerHTML = "Error: Define hora inicio y fin";
+          statusDiv.style.color = "red";
+          return;
+        }
+        params += `&start=${start}&end=${end}&isDuration=0`;
+        details = `Horario diario: ${start} - ${end}`;
+      } else {
+        const start = document.getElementById(`startDur${id}`).value;
+        const h = parseInt(document.getElementById(`durH${id}`).value) || 0;
+        const m = parseInt(document.getElementById(`durM${id}`).value) || 0;
+        const s = parseInt(document.getElementById(`durS${id}`).value) || 0;
+        if (h > 24 || m > 59 || s > 59) {
+          statusDiv.innerHTML = "Error: Horas 0-24, Minutos/Segundos 0-59";
+          statusDiv.style.color = "red";
+          return;
+        }
+        const duration = h * 3600 + m * 60 + s;
+        if(!start || duration <= 0) {
+          statusDiv.innerHTML = "Error: Define hora inicio y duración > 0";
+          statusDiv.style.color = "red";
+          return;
+        }
+        params += `&start=${start}&end=00:00&isDuration=1&duration=${duration}`;
+        details = `Duración: ${start} por ${h}h ${m}m ${s}s`;
+      }
+
+      fetch(`/set_timer?${params}`)
         .then(r => r.text())
         .then(msg => {
+            statusDiv.innerHTML = `Guardado: ${details}`;
+            statusDiv.style.color = "green";
             logToConsole(`Timer ${id} Saved [${enabled ? 'ON' : 'OFF'}]`);
+        })
+        .catch(e => {
+            statusDiv.innerHTML = "Error al guardar";
+            statusDiv.style.color = "red";
         });
   }
 
   function toggleTimerInputs(id) {
     const enabled = document.getElementById(`timerEnable${id}`).checked;
-    const startInput = document.getElementById(`start${id}`);
-    const endInput = document.getElementById(`end${id}`);
+    const radios = document.querySelectorAll(`input[name="mode${id}"]`);
+    const dailyControls = document.getElementById(`dailyControls${id}`);
+    const durationControls = document.getElementById(`durationControls${id}`);
     
-    startInput.disabled = !enabled;
-    endInput.disabled = !enabled;
+    radios.forEach(r => r.disabled = !enabled);
+    if (enabled) {
+      toggleMode(id);
+    } else {
+      dailyControls.style.display = 'none';
+      durationControls.style.display = 'none';
+    }
+  }
+
+  function toggleMode(id) {
+    const mode = document.querySelector(`input[name="mode${id}"]:checked`).value;
+    const dailyControls = document.getElementById(`dailyControls${id}`);
+    const durationControls = document.getElementById(`durationControls${id}`);
+    
+    if (mode === 'daily') {
+      dailyControls.style.display = 'flex';
+      durationControls.style.display = 'none';
+    } else {
+      dailyControls.style.display = 'none';
+      durationControls.style.display = 'flex';
+    }
   }
 
   // -- COMMON --

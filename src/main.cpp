@@ -16,7 +16,7 @@ Preferences preferences;
 
 // Global state
 int relayState[8] = {0};
-const char *APP_VERSION = "0.4";
+const char *APP_VERSION = "0.5";
 String logBuffer = "";
 String relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
                          "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
@@ -29,8 +29,13 @@ struct Timer {
   int endH = -1;
   int endM = -1;
   bool enabled = false;
+  bool isDuration = false;
+  int durationSec = 0;
 };
 Timer timers[8];
+
+// Last on time for duration timers
+unsigned long lastOnTime[8] = {0};
 
 // Logging
 void logEvent(String msg) {
@@ -129,14 +134,24 @@ void handleSetTimer() {
       timers[idx].enabled = true;
     }
 
+    // New: isDuration and durationSec
+    timers[idx].isDuration = server.hasArg("isDuration") && server.arg("isDuration") == "1";
+    if (server.hasArg("duration")) {
+      timers[idx].durationSec = server.arg("duration").toInt();
+    } else {
+      timers[idx].durationSec = 0;
+    }
+
     // Save to NVS for persistence
     preferences.begin("timers", false);
     String key = "t" + String(ch);
-    // Format: startH,startM,endH,endM,enabled
+    // Format: startH,startM,endH,endM,enabled,isDuration,durationSec
     String value = String(timers[idx].startH) + "," +
                    String(timers[idx].startM) + "," + String(timers[idx].endH) +
                    "," + String(timers[idx].endM) + "," +
-                   String(timers[idx].enabled ? 1 : 0);
+                   String(timers[idx].enabled ? 1 : 0) + "," +
+                   String(timers[idx].isDuration ? 1 : 0) + "," +
+                   String(timers[idx].durationSec);
     preferences.putString(key.c_str(), value);
     preferences.end();
 
@@ -197,6 +212,9 @@ void handleGetTimers() {
     } else {
       json += ",\"start\":\"\",\"end\":\"\"";
     }
+    // New fields
+    json += ",\"isDuration\":" + String(timers[i].isDuration ? "true" : "false");
+    json += ",\"duration\":" + String(timers[i].durationSec);
     json += "}";
     if (i < 7)
       json += ",";
@@ -249,19 +267,35 @@ void checkTimers() {
 
     // Check Start
     if (info.tm_hour == timers[i].startH && info.tm_min == timers[i].startM) {
-      if (relayState[i] == 0) {
-        relayState[i] = 1;
-        digitalWrite(RELAY_PINS[i], HIGH);
+      if (timers[i].isDuration) {
+        // Duration mode: turn on if off, and start duration timer
+        if (relayState[i] == 0) {
+          relayState[i] = 1;
+          digitalWrite(RELAY_PINS[i], HIGH);
+          lastOnTime[i] = millis();
 
-        preferences.begin("relay-states", false);
-        preferences.putInt(("r" + String(i)).c_str(), 1);
-        preferences.end();
+          preferences.begin("relay-states", false);
+          preferences.putInt(("r" + String(i)).c_str(), 1);
+          preferences.end();
 
-        logEvent("Timer Trigger: " + relayLabels[i] + " ON");
+          logEvent("Timer Duration Start: " + relayLabels[i] + " ON for " + String(timers[i].durationSec) + "s");
+        }
+      } else {
+        // Daily mode: turn on if off
+        if (relayState[i] == 0) {
+          relayState[i] = 1;
+          digitalWrite(RELAY_PINS[i], HIGH);
+
+          preferences.begin("relay-states", false);
+          preferences.putInt(("r" + String(i)).c_str(), 1);
+          preferences.end();
+
+          logEvent("Timer Trigger: " + relayLabels[i] + " ON");
+        }
       }
     }
-    // Check End
-    if (info.tm_hour == timers[i].endH && info.tm_min == timers[i].endM) {
+    // Check End (only for daily mode)
+    if (!timers[i].isDuration && info.tm_hour == timers[i].endH && info.tm_min == timers[i].endM) {
       if (relayState[i] == 1) {
         relayState[i] = 0;
         digitalWrite(RELAY_PINS[i], LOW);
@@ -271,6 +305,24 @@ void checkTimers() {
         preferences.end();
 
         logEvent("Timer Trigger: " + relayLabels[i] + " OFF");
+      }
+    }
+  }
+}
+
+void checkDurations() {
+  for (int i = 0; i < 8; i++) {
+    if (timers[i].enabled && timers[i].isDuration && relayState[i] == 1 && lastOnTime[i] > 0) {
+      if (millis() - lastOnTime[i] >= (unsigned long)timers[i].durationSec * 1000) {
+        relayState[i] = 0;
+        digitalWrite(RELAY_PINS[i], LOW);
+        lastOnTime[i] = 0; // Reset
+
+        preferences.begin("relay-states", false);
+        preferences.putInt(("r" + String(i)).c_str(), 0);
+        preferences.end();
+
+        logEvent("Timer Duration End: " + relayLabels[i] + " OFF");
       }
     }
   }
@@ -458,10 +510,23 @@ void setup() {
         if (comma4 > 0) {
           timers[idx].endM = value.substring(comma3 + 1, comma4).toInt();
           timers[idx].enabled = value.substring(comma4 + 1).toInt() == 1;
+
+          // New: check for isDuration and durationSec (6th and 7th)
+          int comma5 = value.indexOf(',', comma4 + 1);
+          if (comma5 > 0) {
+            timers[idx].isDuration = value.substring(comma4 + 1, comma5).toInt() == 1;
+            timers[idx].durationSec = value.substring(comma5 + 1).toInt();
+          } else {
+            // Old format, assume false, 0
+            timers[idx].isDuration = false;
+            timers[idx].durationSec = 0;
+          }
         } else {
           // Old format
           timers[idx].endM = value.substring(comma3 + 1).toInt();
           timers[idx].enabled = true;
+          timers[idx].isDuration = false;
+          timers[idx].durationSec = 0;
         }
 
         String stateStr = timers[idx].enabled ? " [ON]" : " [OFF]";
@@ -549,5 +614,6 @@ void setup() {
 void loop() {
   server.handleClient();
   checkTimers();
+  checkDurations();
   updateLed();
 }

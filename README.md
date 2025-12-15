@@ -47,7 +47,7 @@ To flash firmware to this board, you need a USB-TTL Adapter (e.g., CP2102, CH340
 2. Hold down the **001 (Boot)** button (GPIO 0).
 3. Press and release the **EN (Reset)** button.
 4. Release the **001 (Boot)** button.
-5. Upload the firmware.
+5. Upload the firmware (`firmware/firmware.bin`) using your preferred flashing tool (e.g., esptool.py or Arduino IDE).
 6. Upload the web interface (`data` folder) using "Upload Filesystem Image".
 
 ## Quick Home Assistant Integration
@@ -78,6 +78,7 @@ This project includes a comprehensive firmware with a Web Interface for full con
   - Custom Labels: Assign names to each channel (e.g., "Garden Light", "Pump").
 - **Programmable Timers**:
   - Independent Daily Timer for each relay (Start time - End time).
+  - **Duration Timers**: Set relays to turn ON at a specific time and automatically turn OFF after a defined duration (hours, minutes, seconds).
   - **Enable/Disable Switch**: Toggle timers on/off without losing configuration.
   - Persistence: Timer settings are saved in NVS (Non-Volatile Storage).
 - **WiFi Manager**:
@@ -92,6 +93,12 @@ This project includes a comprehensive firmware with a Web Interface for full con
   - JSON API: Full REST API for integration with other systems (`/status`, `/toggle`, etc.).
 
 ## Changelog
+
+### v0.5
+- **New Feature**: Advanced Duration Timers - Relays can be set to turn ON at a specific time and automatically turn OFF after a custom duration (up to 24 hours).
+- **UI Improvements**: Redesigned timer configuration with radio buttons for mode selection, compact input fields (limited to 2 digits), and inline feedback messages for save actions.
+- **Validation**: Input validation for duration fields (hours 0-24, minutes/seconds 0-59) with user-friendly error messages.
+- **Persistence**: Duration timer settings are fully saved and restored.
 
 ### v0.3
 - **New Feature**: Specific HTTP API for Home Assistant (`/api/ha`).
