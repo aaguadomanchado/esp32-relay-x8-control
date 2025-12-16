@@ -1,8 +1,10 @@
 #include "index_html.h"
 #include "pinout.h"
+#include "wifi_manager.h"
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
+#include <Update.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <time.h>
@@ -16,10 +18,11 @@ Preferences preferences;
 
 // Global state
 int relayState[8] = {0};
-const char *APP_VERSION = "0.5";
-String logBuffer = "";
-String relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
-                         "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
+const char *APP_VERSION = "0.6";
+char logBuffer[2048] = "";
+const char *relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
+                             "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
+static char labelStore[8][32];
 bool isApMode = false;
 
 // Timer Structure
@@ -38,11 +41,13 @@ Timer timers[8];
 unsigned long lastOnTime[8] = {0};
 
 // Logging
-void logEvent(String msg) {
+void logEvent(const char *msg) {
   Serial.println(msg);
-  if (logBuffer.length() > 2000)
-    logBuffer = "";
-  logBuffer += msg + "\n";
+  if (strlen(logBuffer) > 1800) {
+    logBuffer[0] = '\0';
+  }
+  strncat(logBuffer, msg, sizeof(logBuffer) - strlen(logBuffer) - 2);
+  strncat(logBuffer, "\n", sizeof(logBuffer) - strlen(logBuffer) - 1);
 }
 
 // -- WEB HANDLERS --
@@ -63,7 +68,9 @@ void handleToggle() {
       preferences.putInt(("r" + String(idx)).c_str(), state);
       preferences.end();
 
-      logEvent("Manual: " + relayLabels[idx] + (state ? " ON" : " OFF"));
+      char msgBuf[128];
+snprintf(msgBuf, sizeof(msgBuf), "Manual: %s %s", relayLabels[idx], state ? "ON" : "OFF");
+logEvent(msgBuf);
       server.send(200, "text/plain", "OK");
       return;
     }
@@ -83,9 +90,9 @@ void handleStatus() {
 }
 
 void handleLogs() {
-  if (logBuffer.length() > 0) {
+  if (strlen(logBuffer) > 0) {
     server.send(200, "text/plain", logBuffer);
-    logBuffer = "";
+    logBuffer[0] = '\0';
   } else
     server.send(200, "text/plain", "");
 }
@@ -100,7 +107,14 @@ void handleSetTime() {
     settimeofday(&tv, NULL);
 
     time_t now = time(nullptr);
-    logEvent("Time Synced: " + String(ctime(&now)));
+    {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Time Synced: %s", ctime(&now));
+    // Remove trailing newline from ctime
+    size_t len = strlen(buf);
+    if (len && buf[len - 1] == '\n') buf[len - 1] = '\0';
+    logEvent(buf);
+}
     server.send(200, "text/plain", "Time Set");
   } else {
     server.send(400, "text/plain", "No epoch");
@@ -156,8 +170,9 @@ void handleSetTimer() {
     preferences.end();
 
     String stateStr = timers[idx].enabled ? " [ON]" : " [OFF]";
-    logEvent("Timer Set " + relayLabels[idx] + ": " + startStr + " - " +
-             endStr + stateStr);
+    char timerMsg[256];
+snprintf(timerMsg, sizeof(timerMsg), "Timer Set %s: %s - %s%s", relayLabels[idx], startStr.c_str(), endStr.c_str(), stateStr.c_str());
+logEvent(timerMsg);
     server.send(200, "text/plain", "OK");
   } else
     server.send(400, "text/plain", "Missing args");
@@ -187,7 +202,9 @@ void handleClearTimer() {
     preferences.remove(key.c_str());
     preferences.end();
 
-    logEvent("Timer Cleared " + relayLabels[idx]);
+    char clearMsg[128];
+snprintf(clearMsg, sizeof(clearMsg), "Timer Cleared %s", relayLabels[idx]);
+logEvent(clearMsg);
     server.send(200, "text/plain", "OK");
   } else {
     server.send(400, "text/plain", "Missing args");
@@ -259,7 +276,11 @@ void checkTimers() {
     return; // Already checked this minute
   lastMin = info.tm_min;
 
-  logEvent("Time Check: " + String(info.tm_hour) + ":" + String(info.tm_min));
+  {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Time Check: %d:%02d", info.tm_hour, info.tm_min);
+    logEvent(buf);
+}
 
   for (int i = 0; i < 8; i++) {
     if (!timers[i].enabled)
@@ -278,7 +299,11 @@ void checkTimers() {
           preferences.putInt(("r" + String(i)).c_str(), 1);
           preferences.end();
 
-          logEvent("Timer Duration Start: " + relayLabels[i] + " ON for " + String(timers[i].durationSec) + "s");
+          {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Timer Duration Start: %s ON for %d s", relayLabels[i], timers[i].durationSec);
+    logEvent(buf);
+}
         }
       } else {
         // Daily mode: turn on if off
@@ -290,7 +315,11 @@ void checkTimers() {
           preferences.putInt(("r" + String(i)).c_str(), 1);
           preferences.end();
 
-          logEvent("Timer Trigger: " + relayLabels[i] + " ON");
+          {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Timer Trigger: %s ON", relayLabels[i]);
+    logEvent(buf);
+}
         }
       }
     }
@@ -304,7 +333,11 @@ void checkTimers() {
         preferences.putInt(("r" + String(i)).c_str(), 0);
         preferences.end();
 
-        logEvent("Timer Trigger: " + relayLabels[i] + " OFF");
+        {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Timer Trigger: %s OFF", relayLabels[i]);
+    logEvent(buf);
+}
       }
     }
   }
@@ -322,7 +355,11 @@ void checkDurations() {
         preferences.putInt(("r" + String(i)).c_str(), 0);
         preferences.end();
 
-        logEvent("Timer Duration End: " + relayLabels[i] + " OFF");
+        {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Timer Duration End: %s OFF", relayLabels[i]);
+    logEvent(buf);
+}
       }
     }
   }
@@ -340,49 +377,8 @@ void updateLed() {
 
 // -- WIFI MANAGER --
 
-void handleScan() {
-  int n = WiFi.scanNetworks();
-  String json = "[";
-  for (int i = 0; i < n; ++i) {
-    if (i)
-      json += ",";
-    json += "{";
-    json += "\"ssid\":\"" + WiFi.SSID(i) + "\",";
-    json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
-    json += "\"secure\":" +
-            String(WiFi.encryptionType(i) != WIFI_AUTH_OPEN ? "true" : "false");
-    json += "}";
-  }
-  json += "]";
-  server.send(200, "application/json", json);
-}
 
-void handleSaveWiFi() {
-  if (server.hasArg("ssid") && server.hasArg("pass")) {
-    String ssid = server.arg("ssid");
-    String pass = server.arg("pass");
 
-    preferences.begin("wifi-config", false);
-    preferences.putString("ssid", ssid);
-    preferences.putString("pass", pass);
-    preferences.end();
-
-    server.send(200, "text/plain", "Saved. Restarting...");
-    delay(1000);
-    ESP.restart();
-  } else {
-    server.send(400, "text/plain", "Missing args");
-  }
-}
-
-void handleResetWiFi() {
-  preferences.begin("wifi-config", false);
-  preferences.clear();
-  preferences.end();
-  server.send(200, "text/plain", "Reset. Restarting...");
-  delay(1000);
-  ESP.restart();
-}
 
 // -- LABELS --
 void handleGetLabels() {
@@ -390,7 +386,9 @@ void handleGetLabels() {
   for (int i = 0; i < 8; i++) {
     if (i)
       json += ",";
-    json += "\"" + relayLabels[i] + "\"";
+    json += "\"";
+    json += relayLabels[i];
+    json += "\"";
   }
   json += "]";
   server.send(200, "application/json", json);
@@ -402,14 +400,19 @@ void handleSetLabel() {
     String label = server.arg("label");
 
     if (ch >= 1 && ch <= 8) {
-      relayLabels[ch - 1] = label;
+      {
+    snprintf(labelStore[ch - 1], sizeof(labelStore[ch - 1]), "%s", label.c_str());
+    relayLabels[ch - 1] = labelStore[ch - 1];
+}
 
       // Save to Preferences
       preferences.begin("relay-labels", false);
       preferences.putString(("label" + String(ch)).c_str(), label);
       preferences.end();
 
-      logEvent("Label updated: " + relayLabels[ch - 1] + " -> " + label);
+      char labelMsg[256];
+snprintf(labelMsg, sizeof(labelMsg), "Label updated: %s -> %s", relayLabels[ch - 1], label.c_str());
+logEvent(labelMsg);
       server.send(200, "text/plain", "OK");
     } else {
       server.send(400, "text/plain", "Invalid channel");
@@ -417,6 +420,112 @@ void handleSetLabel() {
   } else {
     server.send(400, "text/plain", "Missing args");
   }
+}
+
+// -- SYSTEM INFO & OTA --
+void handleSystemInfo() {
+  unsigned long uptimeSeconds = millis() / 1000;
+  unsigned long days = uptimeSeconds / 86400;
+  unsigned long hours = (uptimeSeconds % 86400) / 3600;
+  unsigned long minutes = (uptimeSeconds % 3600) / 60;
+  unsigned long seconds = uptimeSeconds % 60;
+
+  String json = "{";
+  json += "\"version\":\"" + String(APP_VERSION) + "\"";
+  json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
+  json += ",\"totalHeap\":" + String(ESP.getHeapSize());
+  json += ",\"chipModel\":\"" + String(ESP.getChipModel()) + "\"";
+  json += ",\"chipRevision\":" + String(ESP.getChipRevision());
+  json += ",\"cpuFreqMHz\":" + String(ESP.getCpuFreqMHz());
+  json += ",\"flashSize\":" + String(ESP.getFlashChipSize());
+  json += ",\"sketchSize\":" + String(ESP.getSketchSize());
+  json += ",\"freeSketchSpace\":" + String(ESP.getFreeSketchSpace());
+  json += ",\"uptimeSeconds\":" + String(uptimeSeconds);
+  json += ",\"uptimeStr\":\"" + String(days) + "d " + String(hours) + "h " + String(minutes) + "m " + String(seconds) + "s\"";
+  json += ",\"wifiRSSI\":" + String(WiFi.RSSI());
+  json += ",\"wifiSSID\":\"" + WiFi.SSID() + "\"";
+  json += ",\"ipAddress\":\"" + WiFi.localIP().toString() + "\"";
+  json += ",\"macAddress\":\"" + WiFi.macAddress() + "\"";
+  json += ",\"apMode\":" + String(isApMode ? "true" : "false");
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+void handleUpdatePage() {
+  // Landing page after update attempt
+  server.send(200, "text/html", 
+    "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
+    "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+    "<style>body{font-family:Arial;background:#121212;color:#e0e0e0;display:flex;"
+    "justify-content:center;align-items:center;height:100vh;margin:0;}"
+    ".box{background:#1e1e1e;padding:40px;border-radius:12px;text-align:center;}"
+    "h2{color:#bb86fc;margin-bottom:20px;}"
+    "a{color:#bb86fc;}</style></head><body>"
+    "<div class='box'><h2>Firmware Update</h2>"
+    "<p>Use the System tab in the main interface to upload firmware.</p>"
+    "<p><a href='/'>Go to Control Panel</a></p></div></body></html>");
+}
+
+void handleDoUpdate() {
+  // This is called when the upload is complete
+  server.sendHeader("Connection", "close");
+  if (Update.hasError()) {
+    server.send(500, "application/json", "{\"success\":false,\"error\":\"Update failed\"}");
+  } else {
+    server.send(200, "application/json", "{\"success\":true,\"message\":\"Update successful! Rebooting...\"}");
+    delay(1000);
+    ESP.restart();
+  }
+}
+
+void handleDoUpdateUpload() {
+  HTTPUpload& upload = server.upload();
+  
+  if (upload.status == UPLOAD_FILE_START) {
+    {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "OTA Update Start: %s", upload.filename.c_str());
+    logEvent(buf);
+}
+    
+    // Start with max available size
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+      {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "OTA Error: %s", Update.errorString());
+    logEvent(buf);
+}
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    // Write chunked data to flash
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "OTA Write Error: %s", Update.errorString());
+    logEvent(buf);
+}
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) {
+      {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "OTA Update Success: %d bytes", upload.totalSize);
+    logEvent(buf);
+}
+    } else {
+      {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "OTA Error: %s", Update.errorString());
+    logEvent(buf);
+}
+    }
+  }
+}
+
+void handleReboot() {
+  server.send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
+  delay(1000);
+  ESP.restart();
 }
 
 // -- HOME ASSISTANT API --
@@ -442,7 +551,11 @@ void handleHA() {
         preferences.putInt(("r" + String(idx)).c_str(), newState);
         preferences.end();
 
-        logEvent("HA API: " + relayLabels[idx] + " -> " + stateStr);
+        {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "HA API: %s -> %s", relayLabels[idx], stateStr.c_str());
+    logEvent(buf);
+}
       }
     } else {
       // Invalid request
@@ -483,7 +596,8 @@ void setup() {
   for (int i = 1; i <= 8; i++) {
     String saved = preferences.getString(("label" + String(i)).c_str(), "");
     if (saved != "") {
-      relayLabels[i - 1] = saved;
+      snprintf(labelStore[i - 1], sizeof(labelStore[i - 1]), "%s", saved.c_str());
+      relayLabels[i - 1] = labelStore[i - 1];
     }
   }
   preferences.end();
@@ -529,11 +643,16 @@ void setup() {
           timers[idx].durationSec = 0;
         }
 
-        String stateStr = timers[idx].enabled ? " [ON]" : " [OFF]";
-        logEvent("Timer Loaded " + relayLabels[idx] + ": " +
-                 String(timers[idx].startH) + ":" + String(timers[idx].startM) +
-                 " - " + String(timers[idx].endH) + ":" +
-                 String(timers[idx].endM) + stateStr);
+{
+    const char *stateStr = timers[idx].enabled ? " [ON]" : " [OFF]";
+    char timerBuf[128];
+    snprintf(timerBuf, sizeof(timerBuf), "Timer Loaded %s: %02d:%02d - %02d:%02d%s",
+             relayLabels[idx],
+             timers[idx].startH, timers[idx].startM,
+             timers[idx].endH, timers[idx].endM,
+             stateStr);
+    logEvent(timerBuf);
+}
       }
     }
   }
@@ -547,7 +666,11 @@ void setup() {
 
   bool connected = false;
   if (savedSSID != "") {
-    logEvent("Connecting to " + savedSSID + "...");
+      {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "OTA Error: %s", Update.errorString());
+    logEvent(buf);
+}
     WiFi.mode(WIFI_STA);
     WiFi.begin(savedSSID.c_str(), savedPass.c_str());
 
@@ -565,7 +688,9 @@ void setup() {
   }
 
   if (connected) {
-    logEvent("Connected! IP: " + WiFi.localIP().toString());
+    char connMsg[128];
+snprintf(connMsg, sizeof(connMsg), "Connected! IP: %s", WiFi.localIP().toString().c_str());
+logEvent(connMsg);
     digitalWrite(VIS_STATUS_LED, HIGH); // Solid ON
 
     // NTP Setup: UTC+1 (3600s offset), Daylight Savings 1h (3600s)
@@ -575,14 +700,20 @@ void setup() {
     if (MDNS.begin("esp32")) {
       logEvent("mDNS responder started: esp32.local");
     }
-    logEvent("System Started - v" + String(APP_VERSION));
+    {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "System Started - v%s", APP_VERSION);
+    logEvent(buf);
+}
   } else {
     logEvent("Connection failed or no config. Starting AP.");
     isApMode = true;
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
     IPAddress IP = WiFi.softAPIP();
-    logEvent("AP IP: " + IP.toString());
+    char apMsg[128];
+snprintf(apMsg, sizeof(apMsg), "AP IP: %s", IP.toString().c_str());
+logEvent(apMsg);
   }
 
   // Routes
@@ -604,8 +735,12 @@ void setup() {
   server.on("/set_label", handleSetLabel);
   // Home Assistant
   server.on("/api/ha", handleHA);
+  // System & OTA
+  server.on("/system_info", HTTP_GET, handleSystemInfo);
+  server.on("/update", HTTP_GET, handleUpdatePage);
+  server.on("/do_update", HTTP_POST, handleDoUpdate, handleDoUpdateUpload);
+  server.on("/reboot", HTTP_POST, handleReboot);
 
-  server.begin();
   server.begin();
   if (!isApMode)
     digitalWrite(VIS_STATUS_LED, HIGH); // Ensure solid ON if not AP

@@ -373,7 +373,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <h1>ESP32 Control <span style="font-size:0.5em; color:#777;">v0.4</span></h1>
+  <h1>ESP32 Control <span style="font-size:0.5em; color:#777;">v0.6</span></h1>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="openTab('monitor')">Monitor</button>
@@ -381,6 +381,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <button class="tab-btn" onclick="openTab('timers')">Temporizadores</button>
     <button class="tab-btn" onclick="openTab('wifi')">WiFi</button>
     <button class="tab-btn" onclick="openTab('labels')">Etiquetas</button>
+    <button class="tab-btn" onclick="openTab('system')">Sistema</button>
   </div>
 
   <!-- Tab 0: Monitor -->
@@ -442,6 +443,104 @@ const char index_html[] PROGMEM = R"rawliteral(
         <h3 style="margin-top:0; color:var(--accent-color);">Etiquetas Personalizadas</h3>
         <p style="font-size:0.95em; color:#999; margin-bottom:20px;">Asigna nombres personalizados a cada relé. Los cambios se guardan automáticamente.</p>
         <div id="label-list" style="width:100%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 5: System -->
+  <div id="system" class="tab-content">
+    <div style="width:100%; max-width:700px;">
+      <!-- System Info Card -->
+      <div class="card" style="width:100%; padding:20px; margin-bottom:20px;">
+        <h3 style="margin-top:0; color:var(--accent-color);">📊 Información del Sistema</h3>
+        <div id="system-info" style="width:100%;">
+          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:15px; margin-top:15px;">
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Versión Firmware</span>
+              <div id="info-version" style="font-size:1.2rem; color:var(--accent-color); font-weight:600;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Modelo Chip</span>
+              <div id="info-chip" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">CPU Frecuencia</span>
+              <div id="info-cpu" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Memoria RAM Libre</span>
+              <div id="info-heap" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Flash Total</span>
+              <div id="info-flash" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Espacio OTA Libre</span>
+              <div id="info-ota-space" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Tiempo Encendido</span>
+              <div id="info-uptime" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">WiFi RSSI</span>
+              <div id="info-rssi" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">Dirección IP</span>
+              <div id="info-ip" style="font-size:1rem;">--</div>
+            </div>
+            <div class="info-item">
+              <span style="color:#999; font-size:0.85rem;">MAC Address</span>
+              <div id="info-mac" style="font-size:1rem;">--</div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-save" onclick="loadSystemInfo()" style="margin-top:20px; background:#555;">🔄 Actualizar Info</button>
+      </div>
+
+      <!-- OTA Update Card -->
+      <div class="card" style="width:100%; padding:20px; margin-bottom:20px;">
+        <h3 style="margin-top:0; color:var(--accent-color);">⬆️ Actualización de Firmware (OTA)</h3>
+        <p style="font-size:0.95em; color:#999; margin-bottom:20px;">Sube un archivo .bin para actualizar el firmware. El dispositivo se reiniciará automáticamente.</p>
+        
+        <div style="border:2px dashed #555; border-radius:10px; padding:30px; text-align:center; margin-bottom:15px;" id="drop-zone">
+          <div style="font-size:2rem; margin-bottom:10px;">📁</div>
+          <p style="margin:0 0 15px 0; color:#999;">Arrastra el archivo .bin aquí o</p>
+          <input type="file" id="firmware-file" accept=".bin" style="display:none;" onchange="handleFileSelect(this)">
+          <button class="btn-save" onclick="document.getElementById('firmware-file').click()" style="background:#555;">Seleccionar Archivo</button>
+        </div>
+        
+        <div id="file-info" style="display:none; margin-bottom:15px; padding:15px; background:#252525; border-radius:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div id="file-name" style="font-weight:600;"></div>
+              <div id="file-size" style="color:#999; font-size:0.9rem;"></div>
+            </div>
+            <button onclick="clearFile()" style="background:none; border:none; color:#f44; cursor:pointer; font-size:1.2rem;">✕</button>
+          </div>
+        </div>
+        
+        <div id="progress-container" style="display:none; margin-bottom:15px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+            <span>Progreso</span>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div style="background:#333; border-radius:10px; height:20px; overflow:hidden;">
+            <div id="progress-bar" style="background:var(--accent-color); height:100%; width:0%; transition:width 0.3s;"></div>
+          </div>
+          <div id="progress-status" style="margin-top:10px; text-align:center; color:#999;"></div>
+        </div>
+        
+        <button class="btn-save" id="upload-btn" onclick="uploadFirmware()" style="width:100%;" disabled>⬆️ Subir Firmware</button>
+      </div>
+
+      <!-- Reboot Card -->
+      <div class="card" style="width:100%; padding:20px;">
+        <h3 style="margin-top:0; color:var(--accent-color);">🔄 Reiniciar Dispositivo</h3>
+        <p style="font-size:0.95em; color:#999; margin-bottom:20px;">Reinicia el ESP32. La configuración se mantiene.</p>
+        <button onclick="rebootDevice()" style="background:#b00020; color:white; border:none; padding:12px 24px; border-radius:6px; width:100%; cursor:pointer; font-size:1rem; min-height:44px; font-weight:600;">🔄 Reiniciar Ahora</button>
       </div>
     </div>
   </div>
@@ -922,6 +1021,180 @@ const char index_html[] PROGMEM = R"rawliteral(
             .then(msg => alert(msg));
       }
   }
+
+  // -- SYSTEM TAB --
+  let selectedFile = null;
+
+  function loadSystemInfo() {
+    fetch('/system_info')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('info-version').textContent = 'v' + data.version;
+        document.getElementById('info-chip').textContent = data.chipModel + ' (Rev ' + data.chipRevision + ')';
+        document.getElementById('info-cpu').textContent = data.cpuFreqMHz + ' MHz';
+        document.getElementById('info-heap').textContent = formatBytes(data.freeHeap) + ' / ' + formatBytes(data.totalHeap);
+        document.getElementById('info-flash').textContent = formatBytes(data.flashSize);
+        document.getElementById('info-ota-space').textContent = formatBytes(data.freeSketchSpace);
+        document.getElementById('info-uptime').textContent = data.uptimeStr;
+        document.getElementById('info-rssi').textContent = data.wifiRSSI + ' dBm';
+        document.getElementById('info-ip').textContent = data.ipAddress;
+        document.getElementById('info-mac').textContent = data.macAddress;
+      })
+      .catch(e => logToConsole('Error loading system info'));
+  }
+
+  function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function handleFileSelect(input) {
+    const file = input.files[0];
+    if (file) {
+      if (!file.name.endsWith('.bin')) {
+        alert('Por favor selecciona un archivo .bin');
+        input.value = '';
+        return;
+      }
+      selectedFile = file;
+      document.getElementById('file-info').style.display = 'block';
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-size').textContent = formatBytes(file.size);
+      document.getElementById('upload-btn').disabled = false;
+    }
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('firmware-file').value = '';
+    document.getElementById('file-info').style.display = 'none';
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('progress-container').style.display = 'none';
+  }
+
+  function uploadFirmware() {
+    if (!selectedFile) {
+      alert('Selecciona un archivo primero');
+      return;
+    }
+
+    if (!confirm('¿Estás seguro de actualizar el firmware? El dispositivo se reiniciará.')) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('firmware', selectedFile);
+
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('progress-container').style.display = 'block';
+    document.getElementById('progress-status').textContent = 'Subiendo firmware...';
+
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-percent').textContent = percent + '%';
+      }
+    });
+
+    xhr.addEventListener('load', function() {
+      if (xhr.status === 200) {
+        document.getElementById('progress-status').innerHTML = '<span style="color:#4caf50;">✓ Actualización exitosa! Reiniciando...</span>';
+        document.getElementById('progress-bar').style.background = '#4caf50';
+        logToConsole('OTA Update successful! Rebooting...');
+        
+        // Wait and reload page
+        setTimeout(() => {
+          document.getElementById('progress-status').innerHTML = '<span style="color:#999;">Reconectando en 10 segundos...</span>';
+          setTimeout(() => {
+            window.location.reload();
+          }, 10000);
+        }, 2000);
+      } else {
+        document.getElementById('progress-status').innerHTML = '<span style="color:#f44;">✗ Error en la actualización</span>';
+        document.getElementById('progress-bar').style.background = '#f44';
+        document.getElementById('upload-btn').disabled = false;
+        logToConsole('OTA Update failed: ' + xhr.responseText);
+      }
+    });
+
+    xhr.addEventListener('error', function() {
+      document.getElementById('progress-status').innerHTML = '<span style="color:#f44;">✗ Error de conexión</span>';
+      document.getElementById('progress-bar').style.background = '#f44';
+      document.getElementById('upload-btn').disabled = false;
+      logToConsole('OTA Update error: Connection failed');
+    });
+
+    xhr.open('POST', '/do_update', true);
+    xhr.send(formData);
+  }
+
+  function rebootDevice() {
+    if (confirm('¿Reiniciar el dispositivo ahora?')) {
+      fetch('/reboot', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          alert('Reiniciando... La página se recargará en 10 segundos.');
+          logToConsole('Rebooting device...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 10000);
+        })
+        .catch(e => alert('Error al reiniciar'));
+    }
+  }
+
+  // Setup drag and drop for OTA
+  function setupDropZone() {
+    const dropZone = document.getElementById('drop-zone');
+    if (!dropZone) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.style.borderColor = 'var(--accent-color)';
+        dropZone.style.background = 'rgba(187, 134, 252, 0.1)';
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.style.borderColor = '#555';
+        dropZone.style.background = 'transparent';
+      }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        document.getElementById('firmware-file').files = files;
+        handleFileSelect(document.getElementById('firmware-file'));
+      }
+    }, false);
+  }
+
+  // Load system info when system tab is opened
+  const originalOpenTab = openTab;
+  openTab = function(tabName) {
+    originalOpenTab(tabName);
+    if (tabName === 'system') {
+      loadSystemInfo();
+      setupDropZone();
+    }
+  };
 
   window.onload = init;
 </script>
