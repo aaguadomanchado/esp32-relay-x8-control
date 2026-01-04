@@ -18,7 +18,7 @@ Preferences preferences;
 
 // Global state
 int relayState[8] = {0};
-const char *APP_VERSION = "0.6";
+const char *APP_VERSION = "0.7";
 char logBuffer[2048] = "";
 const char *relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
                              "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
