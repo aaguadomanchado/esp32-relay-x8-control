@@ -1,0 +1,4 @@
+key,type,encoding,value
+wifi-config,namespace,,
+ssid,data,string,Default
+pass,data,string,default
