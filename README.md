@@ -114,3 +114,4 @@ This project includes a comprehensive firmware with a Web Interface for full con
 
 ### v0.1
 - **Initial Release**: Basic functionality, relay control, timers, and Web UI.
+ 
