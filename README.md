@@ -47,7 +47,8 @@ To flash firmware to this board, you need a USB-TTL Adapter (e.g., CP2102, CH340
 2. Hold down the **001 (Boot)** button (GPIO 0).
 3. Press and release the **EN (Reset)** button.
 4. Release the **001 (Boot)** button.
-5. Upload the firmware (`firmware/firmware.bin`) using your preferred flashing tool (e.g., esptool.py or Arduino IDE).
+5. Upload the firmware (`firmware_full_YYYYMMDD_HHMMSS.bin`) using your preferred flashing tool (e.g., esptool.py or Arduino IDE).
+   > **Note**: The firmware filename now includes the compilation timestamp for better version control (e.g., `firmware_full_20260105_033339.bin`).
 6. Upload the web interface (`data` folder) using "Upload Filesystem Image".
 
 ## Quick Home Assistant Integration
@@ -88,11 +89,23 @@ This project includes a comprehensive firmware with a Web Interface for full con
 - **System Time**:
   - NTP Client: Automatically syncs time with internet time servers.
   - Manual Sync: Fallback option to set time from browser.
-- **Developer Tools**:
+- **Developer Tools**:// ... existing code ...
+### v0.7.1 (Logs Enhanced)
+- **Exhaustive Serial Logging**: Detailed boot logs for NVS initialization, WiFi attempts (with countdown), AP details, RSSI, MAC address.
+- **New Binary**: `firmware_full_vlogs.bin` with enhanced diagnostics.
+
+### v0.7
+// ... rest of code ...
   - Web Serial Console: View debug logs directly in the browser (Test-Debug tab).
   - JSON API: Full REST API for integration with other systems (`/status`, `/toggle`, etc.).
 
 ## Changelog
+
+### v0.8
+- **Externalized Credentials**: WiFi AP and STA default credentials moved to `credentials.h` for easy pre-compilation editing.
+- **Dynamic Version Display**: Firmware version now dynamically injected into HTML from code variable, ensuring consistency.
+- **Timestamped Firmware Builds**: Firmware binaries now include compilation date and time in filename (e.g., `firmware_full_20260105_033339.bin`) for improved version tracking.
+- **Full Firmware Image**: Post-build script generates complete ESP32 image including bootloader and partitions, preventing boot loops after full chip erase.
 
 ### v0.5
 - **New Feature**: Advanced Duration Timers - Relays can be set to turn ON at a specific time and automatically turn OFF after a custom duration (up to 24 hours).

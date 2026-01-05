@@ -1,6 +1,7 @@
 #include "index_html.h"
 #include "pinout.h"
 #include "wifi_manager.h"
+#include "credentials.h"
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
@@ -9,16 +10,16 @@
 #include <WiFi.h>
 #include <time.h>
 
-// AP Credentials
-const char *ssid = "ESP32-Relay-X8";
-const char *password = "12345678";
+// AP Credentials (definidas en credentials.h)
+const char *ssid = DEFAULT_AP_SSID;
+const char *password = DEFAULT_AP_PASSWORD;
 
 WebServer server(80);
 Preferences preferences;
 
 // Global state
 int relayState[8] = {0};
-const char *APP_VERSION = "0.7";
+const char *APP_VERSION = "0.8";
 char logBuffer[2048] = "";
 const char *relayLabels[8] = {"Relay 1", "Relay 2", "Relay 3", "Relay 4",
                              "Relay 5", "Relay 6", "Relay 7", "Relay 8"};
@@ -52,7 +53,11 @@ void logEvent(const char *msg) {
 
 // -- WEB HANDLERS --
 
-void handleRoot() { server.send(200, "text/html", index_html); }
+void handleRoot() { 
+  String html = index_html;
+  html.replace("{{VERSION}}", APP_VERSION);
+  server.send(200, "text/html", html); 
+}
 
 void handleToggle() {
   if (server.hasArg("channel") && server.hasArg("state")) {
@@ -665,14 +670,26 @@ void setup() {
   preferences.end();
 
   bool connected = false;
+  String ssidToUse;
+  String passToUse;
+
   if (savedSSID != "") {
-      {
+    ssidToUse = savedSSID;
+    passToUse = savedPass;
+  } else {
+    // Usar credenciales por defecto para STA
+    ssidToUse = DEFAULT_STA_SSID;
+    passToUse = DEFAULT_STA_PASSWORD;
+  }
+
+  if (ssidToUse != "") {
+    {
     char buf[128];
-    snprintf(buf, sizeof(buf), "OTA Error: %s", Update.errorString());
+    snprintf(buf, sizeof(buf), "Intentando conectar a: %s", ssidToUse.c_str());
     logEvent(buf);
 }
     WiFi.mode(WIFI_STA);
-    WiFi.begin(savedSSID.c_str(), savedPass.c_str());
+    WiFi.begin(ssidToUse.c_str(), passToUse.c_str());
 
     // Wait for connection (20s timeout)
     unsigned long startAttempt = millis();

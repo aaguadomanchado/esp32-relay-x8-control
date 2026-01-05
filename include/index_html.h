@@ -373,7 +373,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <h1>ESP32 Control <span style="font-size:0.5em; color:#777;">v0.6</span></h1>
+  <h1>ESP32 Control <span style="font-size:0.5em; color:#777;">v{{VERSION}}</span></h1>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="openTab('monitor')">Monitor</button>
@@ -1029,7 +1029,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     fetch('/system_info')
       .then(r => r.json())
       .then(data => {
-        document.getElementById('info-version').textContent = 'v' + data.version;
+        document.getElementById('info-version').textContent = 'v{{VERSION}}';
         document.getElementById('info-chip').textContent = data.chipModel + ' (Rev ' + data.chipRevision + ')';
         document.getElementById('info-cpu').textContent = data.cpuFreqMHz + ' MHz';
         document.getElementById('info-heap').textContent = formatBytes(data.freeHeap) + ' / ' + formatBytes(data.totalHeap);
