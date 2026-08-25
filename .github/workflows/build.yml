@@ -1,0 +1,36 @@
+name: Build Firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: pip install platformio pyserial
+
+      - name: Create credentials placeholder (build must not depend on secrets)
+        run: |
+          if [ ! -f include/credentials.h ]; then
+            cp include/credentials.h.example include/credentials.h
+          fi
+
+      - name: Build firmware
+        run: pio run
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/esp32dev/firmware_full_*.bin
+          if-no-files-found: error

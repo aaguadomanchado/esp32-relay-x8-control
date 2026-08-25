@@ -1,5 +1,14 @@
 # Changelog - ESP32 Relay X8 Control
 
+## [0.10] - 2026-08-25
+### Added
+- **API REST unificada**:
+  - `GET /api/relays` — estado completo (id, estado, label, timer activo) en una sola llamada.
+  - `PUT /api/relays/{n}` — control por JSON: `{"state": true}` o `{"state": false}`.
+- **Estadísticas de uso por canal**: contador de conmutaciones y horas acumuladas de encendido, visibles en `GET /api/stats`. Persistidas en NVS con escritura diferida (cada 60 s solo si hay cambios ≥60 s nuevos, para minimizar desgaste de flash).
+- **Modo interlock configurable**: grupos de canales mutuamente excluyentes vía `INTERLOCK_GROUPS` en `main.cpp` (ej. bombas o resistencias que no deben estar simultáneamente ON). Al encender un canal se apagan automáticamente los demás de su grupo.
+- **CI con GitHub Actions**: workflow `.github/workflows/build.yml` que compila el firmware en cada push/PR y publica el binario como artefacto.
+
 ## [0.9] - 2026-08-25
 ### Security
 - **Autenticación por token** (`X-Auth-Token`) en endpoints sensibles: OTA (`/do_update`), `/reboot`, `/save_wifi`, `/reset_wifi` y `/scan`.

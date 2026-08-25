@@ -93,6 +93,9 @@ The web server listens on port 80. All responses are plain text or JSON.
 | Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
 | `/api/ha` | POST/GET | `channel` (1-8), `state` (ON/OFF) | Optimized for `RESTful Switch`. Returns JSON `{"r1":"OFF", "r2":"ON"...}` with all relay states. Invalid channel/state → HTTP 400. |
+| `/api/relays` | GET | - | Unified state: `{"relays":[{id, on, label, timerEnabled},...]}` |
+| `/api/relays/{n}` | PUT | JSON body `{"state": true\|false}` | Sets relay n. Returns `{id, on}`. |
+| `/api/stats` | GET | - | Per-channel usage: toggles, ON-seconds, ON-hours. |
 
 ### Timers
 
@@ -126,6 +129,7 @@ Firmware uses the `Preferences` library to save configuration in the ESP32 NVS p
 | `relay-states` | `r{N}` | Int | Last state of channel N (0/1, 0-indexed) |
 | `relay-labels` | `label{N}` | String | Custom name for channel N (1-8) |
 | `timers` | `t{N}` | String | Timer config: `"startH,startM,endH,endM,enabled,isDuration,durationSec"` |
+| `relay-stats` | `on{N}` / `tg{N}` | UInt | Accumulated ON seconds / toggle count for channel N |
 
 ## Internal Logic
 

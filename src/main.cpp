@@ -12,11 +12,17 @@
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const char *APP_VERSION = "0.9";
+const char *APP_VERSION = "0.10";
 
 // Token de autenticacion para endpoints sensibles (OTA, reboot, wifi config).
 // Cambialo o dejalo vacio para desactivar la comprobacion.
 const char *ADMIN_TOKEN = "cambia-este-token";
+
+// Modo interlock: canales mutuamente excluyentes (solo uno ON a la vez).
+// Ejemplo de grupos (termina en -1): {0,1,-1} = relays 1-2 excluyentes.
+// Dejar solo {-1} para desactivar.
+static const int INTERLOCK_GROUPS[][9] = {
+    {-1}};
 
 // ---------------------------------------------------------------------------
 // Global state
@@ -50,6 +56,53 @@ static uint64_t millis64() {
     high32++;
   low32 = now;
   return ((uint64_t)high32 << 32) | low32;
+}
+
+// ---------------------------------------------------------------------------
+// Estadisticas de uso por canal
+// ---------------------------------------------------------------------------
+struct RelayStats {
+  uint32_t toggles = 0;        // conmutaciones totales
+  uint64_t onSeconds = 0;      // segundos acumulados encendido (sesion + NVS)
+  uint32_t persistedOnSec = 0; // base persistida en NVS
+};
+RelayStats stats[NUM_RELAYS];
+static uint32_t lastStatsFlush = 0;
+static const uint32_t STATS_FLUSH_MS = 60000; // persistir cada 60 s si cambio
+
+// Cierra el periodo encendido del canal idx (suma segundos y resetea marca)
+static void statsOff(int idx) {
+  if (!relayState[idx] || lastOnTimeMs[idx] == 0)
+    return;
+  uint64_t elapsedSec = (millis64() - lastOnTimeMs[idx]) / 1000ULL;
+  stats[idx].onSeconds += elapsedSec;
+  lastOnTimeMs[idx] = 0;
+}
+
+// Persiste estadisticas en NVS si ha pasado el intervalo
+static void flushStats() {
+  if (millis() - lastStatsFlush < STATS_FLUSH_MS)
+    return;
+  lastStatsFlush = millis();
+  bool dirty = false;
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    if ((uint32_t)(stats[i].onSeconds - stats[i].persistedOnSec) >= 60) {
+      dirty = true;
+      break;
+    }
+  }
+  if (!dirty)
+    return;
+  preferences.begin("relay-stats", false);
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    if ((uint32_t)(stats[i].onSeconds - stats[i].persistedOnSec) >= 60) {
+      preferences.putUInt(("on" + String(i)).c_str(),
+                          (uint32_t)stats[i].onSeconds);
+      preferences.putUInt(("tg" + String(i)).c_str(), stats[i].toggles);
+      stats[i].persistedOnSec = (uint32_t)stats[i].onSeconds;
+    }
+  }
+  preferences.end();
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +151,38 @@ bool checkAuth() {
 void setRelay(int idx, bool on, const char *source) {
   if (idx < 0 || idx >= NUM_RELAYS || on == relayState[idx])
     return;
+
+  // Interlock: si se enciende, apagar primero el resto de su grupo
+  if (on) {
+    for (const auto &group : INTERLOCK_GROUPS) {
+      bool inGroup = false;
+      for (int g = 0; g < NUM_RELAYS + 1 && group[g] != -1; g++)
+        if (group[g] == idx) {
+          inGroup = true;
+          break;
+        }
+      if (!inGroup)
+        continue;
+      for (int g = 0; g < NUM_RELAYS + 1 && group[g] != -1; g++) {
+        int other = group[g];
+        if (other != idx && relayState[other]) {
+          statsOff(other); // contabilizar antes de apagar
+          relayState[other] = false;
+          digitalWrite(RELAY_PINS[other], LOW);
+          lastOnTimeMs[other] = 0;
+          preferences.begin("relay-states", false);
+          preferences.putInt(("r" + String(other)).c_str(), 0);
+          preferences.end();
+        }
+      }
+    }
+  }
+
+  // Estadisticas
+  if (!on)
+    statsOff(idx); // cerrar periodo encendido
+  else
+    stats[idx].toggles++;
   relayState[idx] = on;
   digitalWrite(RELAY_PINS[idx], on ? HIGH : LOW);
 
@@ -419,6 +504,86 @@ void handleReboot() {
   ESP.restart();
 }
 
+// ---------------------------------------------------------------------------
+// API REST unificada
+// GET  /api/relays          -> estado completo con labels y timers activos
+// PUT  /api/relays/{n}      -> body JSON {"state": true|false}
+// ---------------------------------------------------------------------------
+void handleApiRelays() {
+  String json = "{\"relays\":[";
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    if (i)
+      json += ",";
+    json += "{\"id\":";
+    json += i + 1;
+    json += ",\"on\":";
+    json += relayState[i] ? "true" : "false";
+    json += ",\"label\":\"";
+    json += relayLabels[i];
+    json += "\",\"timerEnabled\":";
+    json += timers[i].enabled ? "true" : "false";
+    json += "}";
+  }
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
+int parseRelayPath(const String &path) {
+  // /api/relays/3 -> 3 (0 si no matchea)
+  const char *prefix = "/api/relays/";
+  if (!path.startsWith(prefix))
+    return 0;
+  int n = path.substring(strlen(prefix)).toInt();
+  return (n >= 1 && n <= NUM_RELAYS) ? n : 0;
+}
+
+void handleApiRelayPut() {
+  int n = parseRelayPath(server.uri());
+  if (!n) {
+    server.send(404, "application/json", "{\"error\":\"unknown relay\"}");
+    return;
+  }
+  // Body JSON minimo: {"state":true} / {"state":false} / "on"/"off"
+  String body = server.arg("plain");
+  body.trim();
+  bool on;
+  if (body.indexOf("true") >= 0 || body.indexOf("\"on\"") >= 0)
+    on = true;
+  else if (body.indexOf("false") >= 0 || body.indexOf("\"off\"") >= 0)
+    on = false;
+  else {
+    server.send(400, "application/json", "{\"error\":\"expected {\\\"state\\\":bool}\"}");
+    return;
+  }
+  setRelay(n - 1, on, "REST API");
+  char json[64];
+  snprintf(json, sizeof(json), "{\"id\":%d,\"on\":%s}", n,
+           on ? "true" : "false");
+  server.send(200, "application/json", json);
+}
+
+void handleStats() {
+  String json = "[";
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    if (i)
+      json += ",";
+    uint64_t totalSec = stats[i].onSeconds;
+    if (relayState[i] && lastOnTimeMs[i] > 0)
+      totalSec += (millis64() - lastOnTimeMs[i]) / 1000ULL;
+    json += "{\"label\":\"";
+    json += relayLabels[i];
+    json += "\",\"toggles\":";
+    json += stats[i].toggles;
+    json += ",\"onSeconds\":";
+    json += String((unsigned long long)totalSec);
+    json += ",\"onHours\":";
+    json += String((unsigned long)(totalSec / 3600ULL));
+    json += "}";
+  }
+  json += "]";
+  server.send(200, "application/json", json);
+}
+
 // --- Home Assistant API ---
 void handleHA() {
   if (server.hasArg("channel") && server.hasArg("state")) {
@@ -601,6 +766,15 @@ void setup() {
   }
   preferences.end();
 
+  // Estadisticas persistidas
+  preferences.begin("relay-stats", true);
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    stats[i].onSeconds = preferences.getUInt(("on" + String(i)).c_str(), 0);
+    stats[i].persistedOnSec = (uint32_t)stats[i].onSeconds;
+    stats[i].toggles = preferences.getUInt(("tg" + String(i)).c_str(), 0);
+  }
+  preferences.end();
+
   // WiFi (modulo dedicado: conexion, NTP, mDNS o fallback AP)
   wifiSetup(preferences, isApMode, DEFAULT_AP_SSID, DEFAULT_AP_PASSWORD);
 
@@ -618,6 +792,10 @@ void setup() {
   server.on("/set_label", HTTP_GET, handleSetLabel);
   server.on("/api/ha", HTTP_GET, handleHA);
   server.on("/api/ha", HTTP_POST, handleHA);
+  // API REST unificada + estadisticas
+  server.on("/api/relays", HTTP_GET, handleApiRelays);
+  server.on("/api/stats", HTTP_GET, handleStats);
+  server.on("/api/relays/", HTTP_PUT, handleApiRelayPut);
   // WiFi (con auth)
   server.on("/scan", HTTP_GET, [] {
     if (checkAuth())
@@ -654,4 +832,5 @@ void loop() {
   checkDurations();
   updateLed();
   checkWifiReconnect();
+  flushStats();
 }

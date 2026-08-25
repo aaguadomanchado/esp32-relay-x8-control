@@ -106,6 +106,12 @@ This project includes a comprehensive firmware with a Web Interface for full con
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
+### v0.10 - 2026-08-25
+- **Unified REST API**: `GET /api/relays` (full state), `PUT /api/relays/{n}` with JSON body.
+- **Usage statistics**: per-channel toggle counter and ON-hours (`GET /api/stats`), persisted to NVS with deferred writes.
+- **Interlock mode**: configurable mutually-exclusive channel groups (`INTERLOCK_GROUPS` in `main.cpp`).
+- **CI**: GitHub Actions workflow builds the firmware on every push and publishes the binary artifact.
+
 ### v0.9 - 2026-08-25
 - **Security**: token auth on sensitive endpoints, credentials out of the repo, full input validation, fixed buffer overflow in `/scan`.
 - **Reliability**: automatic WiFi reconnect, robust timers, non-destructive circular logs, 64-bit duration clock.
