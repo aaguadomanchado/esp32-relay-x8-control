@@ -25,6 +25,13 @@ jobs:
             cp include/credentials.h.example include/credentials.h
           fi
 
+      - name: Fix esptool shebang permissions (Linux runners)
+        run: |
+          find ~/.platformio/packages/tool-esptoolpy -name '*.py' -exec sed -i '1s|^#!.*python.*|#!/usr/bin/env python3|' {} + || true
+          chmod +x ~/.platformio/packages/tool-esptoolpy/*.py 2>/dev/null || true
+          # Asegurar que 'python' existe (esptool.py lo invoca indirectamente)
+          which python || sudo ln -sf "$(which python3)" /usr/local/bin/python
+
       - name: Build firmware
         run: pio run
 
