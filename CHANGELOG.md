@@ -1,5 +1,39 @@
 # Changelog - ESP32 Relay X8 Control
 
+## [0.9] - 2026-08-25
+### Security
+- **Autenticación por token** (`X-Auth-Token`) en endpoints sensibles: OTA (`/do_update`), `/reboot`, `/save_wifi`, `/reset_wifi` y `/scan`.
+- **Credenciales fuera del repo**: `credentials.h` eliminado del control de versiones (gitignored). Se incluye plantilla `credentials.h.example`.
+- **Validación de entradas en todos los endpoints**: canal 1-8, estado 0/1, horas válidas de timers, SSID 1-32 chars y contraseña WPA2 8-63 chars.
+- **Fix overflow en `/scan`**: buffer acotado con escape JSON correcto de SSIDs (antes podía escribir fuera de un buffer fijo de 4 KB).
+
+### Added
+- **Reconexión automática de WiFi**: chequeo cada 30 s + reintento, el dispositivo se recupera solo si el router cae.
+- **Logs circulares no destructivos**: buffer circular de 40 líneas que se conserva al consultar `/logs` (opcional `?clear=1` para vaciar).
+- **Timers robustos**: disparan aunque se pierda el minuto exacto (bloqueos del loop, reinicios, subidas OTA).
+- **Duraciones sin overflow**: reloj interno de 64 bits (`millis64()`), sin límite práctico de duración.
+- **Encendido manual compatible con timers de duración**: encender un relé manualmente arranca la cuenta atrás si tiene timer de duración activo.
+- **Zona horaria Europe/Madrid**: NTP con CET/CEST automático vía `configTzTime` (sustituye al offset UTC+1 fijo).
+
+### Changed
+- **Código muerto eliminado**: borrados `relay_manager.*`, `timer_manager.*`, `web_server_handlers.*` (no se usaban; `main.cpp` era la implementación real).
+- **Duplicación WiFi eliminada**: `main.cpp` ahora usa `wifi_manager.cpp` para conexión, NTP, mDNS y fallback AP.
+- **JSON construido con buffers fijos** (`snprintf`) en handlers de estado/timers/HA: menos fragmentación de heap en ejecución 24/7.
+
+### Fixed
+- Validación de `state` en `/toggle` (antes aceptaba cualquier entero).
+- `/api/ha` ahora responde 400 ante canal/estado inválidos (antes los ignoraba silenciosamente).
+
+## [0.8] - 2026-06-06
+### Changed
+- Credenciales AP/STA externalizadas a `credentials.h`.
+- Versión mostrada dinámicamente en la web (reemplazo de `{{VERSION}}`).
+- Binarios con timestamp en el nombre (`firmware_full_YYYYMMDD_HHMMSS.bin`).
+- Imagen completa post-build (bootloader + particiones + app) para flasheo desde offset 0x0.
+
+### Security note (retroactivo)
+La v0.8 publicó credenciales WiFi reales en `include/credentials.h`. El historial fue purgado y el repo recreado limpio en agosto de 2026. Si clonaste antes, cambia tu contraseña WiFi.
+
 ## [0.7] - 2024-05-22
 ### Added
 - Preparación para la nueva versión de desarrollo.

@@ -86,19 +86,30 @@ This project includes a comprehensive firmware with a Web Interface for full con
   - Connects to selected WiFi network (Station Mode).
   - Fallback to Access Point (AP) mode if connection fails (`ESP32-Relay-X8` / `12345678`).
 - **System Time**:
-  - NTP Client: Automatically syncs time with internet time servers.
+  - NTP Client: Automatically syncs time with internet time servers (Europe/Madrid timezone, DST auto).
   - Manual Sync: Fallback option to set time from browser.
-- **Developer Tools**:// ... existing code ...
-### v0.7.1 (Logs Enhanced)
-- **Exhaustive Serial Logging**: Detailed boot logs for NVS initialization, WiFi attempts (with countdown), AP details, RSSI, MAC address.
-- **New Binary**: `firmware_full_vlogs.bin` with enhanced diagnostics.
-
-### v0.7
-// ... rest of code ...
+- **Reliability** (v0.9):
+  - Automatic WiFi reconnection every 30s if the router drops.
+  - Robust timers that still fire if the exact minute is missed.
+  - Circular non-destructive log buffer (40 lines) served via `/logs`.
+- **Developer Tools**:
   - Web Serial Console: View debug logs directly in the browser (Test-Debug tab).
-  - JSON API: Full REST API for integration with other systems (`/status`, `/toggle`, etc.).
+  - JSON API: Full REST API for integration with other systems (`/status`, `/toggle`, `/api/ha`, etc.).
+
+## Security (v0.9)
+
+- Sensitive endpoints (`/do_update` OTA, `/reboot`, `/save_wifi`, `/reset_wifi`, `/scan`) require an `X-Auth-Token` header. Set your token in `ADMIN_TOKEN` (`src/main.cpp`) before compiling.
+- WiFi credentials are **not** stored in the repository anymore. Copy `include/credentials.h.example` to `include/credentials.h` and fill in your values before compiling — it is gitignored.
+- All HTTP inputs are validated (channel range, state, timer times, SSID/password lengths).
 
 ## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+
+### v0.9 - 2026-08-25
+- **Security**: token auth on sensitive endpoints, credentials out of the repo, full input validation, fixed buffer overflow in `/scan`.
+- **Reliability**: automatic WiFi reconnect, robust timers, non-destructive circular logs, 64-bit duration clock.
+- **Code health**: removed dead modules (`relay_manager`, `timer_manager`, `web_server_handlers`), de-duplicated WiFi logic into `wifi_manager.cpp`, NTP timezone Europe/Madrid.
 
 ### v0.8
 - **Externalized Credentials**: WiFi AP and STA default credentials moved to `credentials.h` for easy pre-compilation editing.
