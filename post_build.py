@@ -15,9 +15,21 @@ def post_build(source, target, env):
         merged_name = f"firmware_full_{timestamp}.bin"
         merged_path = os.path.join(build_dir, merged_name)
 
-        # Merge command
+        # Merge command: localizar esptool.py del toolchain y ejecutarlo con
+        # el interprete actual (evita problemas de shebang/permisos en CI)
+        import sys
+        candidates = [
+            os.path.expanduser("~/.platformio/packages/tool-esptoolpy/esptool.py"),
+            os.path.join(os.path.dirname(sys.executable), "esptool.py"),
+        ]
+        esptool = next((c for c in candidates if os.path.exists(c)), None)
+        if not esptool:
+            print("esptool.py not found; skipping merge")
+            return
+
         cmd = [
-            "esptool.py", "--chip", "esp32", "merge_bin",
+            sys.executable, esptool,
+            "--chip", "esp32", "merge_bin",
             "-o", merged_path,
             "--flash_mode", "dio",
             "--flash_freq", "40m",
