@@ -1,0 +1,108 @@
+{
+  "device_info": {
+    "name": "ESP32 Relay Board x8",
+    "description": "Placa de desarrollo con ESP32 diseñada para controlar 8 relés de forma independiente.",
+    "microcontroller": "ESP32-WROOM-32E",
+    "connectivity": [
+      "Wi-Fi",
+      "Bluetooth"
+    ]
+  },
+  "power_supply": {
+    "input_methods": [
+      {
+        "type": "Low Voltage",
+        "voltage": "5V DC",
+        "pins": ["5V", "GND"]
+      },
+      {
+        "type": "Wide Range",
+        "voltage": "7-30V DC",
+        "pins": ["7-30V", "GND"]
+      }
+    ],
+    "consumption": {
+      "idle": "~100mA",
+      "max_load_all_relays_on": ">500mA"
+    },
+    "warning": "Solo corriente continua (DC). No conectar 24V AC (común en riego) directamente a la alimentación de la placa."
+  },
+  "pinout_mapping": {
+    "relays": [
+      {
+        "channel": 1,
+        "gpio": 32,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 2,
+        "gpio": 33,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 3,
+        "gpio": 25,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 4,
+        "gpio": 26,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 5,
+        "gpio": 27,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 6,
+        "gpio": 14,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 7,
+        "gpio": 12,
+        "logic": "Active HIGH"
+      },
+      {
+        "channel": 8,
+        "gpio": 13,
+        "logic": "Active HIGH"
+      }
+    ],
+    "indicators": {
+      "status_led_gpio": 23
+    },
+    "buttons": {
+      "programming_boot_button": {
+        "gpio": 0,
+        "label_on_board": "001"
+      },
+      "reset_button": {
+        "function": "Hardware Reset",
+        "label_on_board": "EN"
+      }
+    },
+    "communication": {
+      "uart": {
+        "rx_pin": "RX",
+        "tx_pin": "TX",
+        "voltage_level": "3.3V"
+      }
+    }
+  },
+  "relay_specs": {
+    "type": "Optocoupled",
+    "terminals": ["COM", "NO", "NC"],
+    "max_current_rating": "10A"
+  },
+  "programming_instructions": {
+    "requires_adapter": "USB-TTL (CH340, CP2102, FTDI)",
+    "steps": [
+      "Conectar adaptador USB-TTL (TX a RX, RX a TX, GND a GND, 5V a 5V).",
+      "Mantener presionado el botón '001' (GPIO0).",
+      "Presionar brevemente el botón 'EN' (Reset).",
+      "Soltar el botón '001' cuando comience la carga del firmware."
+    ]
+  }
+}

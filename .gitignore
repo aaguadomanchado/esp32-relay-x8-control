@@ -1,0 +1,33 @@
+# PlatformIO and ESP32 specific
+.pio/
+.vscode/
+.clang_complete
+.gcc-flags.json
+*.pyc
+__pycache__/
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Build artifacts
+*.o
+*.elf
+*.bin
+*.map
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+secrets.h
+credentials.h
+
+# Logs
+*.log
